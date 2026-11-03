@@ -53,7 +53,8 @@ export function Combobox({
           placeholder={placeholder}
           required={required}
           maxLength={40}
-          autoComplete="off"
+          // Chrome ignores "off" on address-like fields (city, province); an unknown token does turn its autofill popup off.
+          autoComplete="combobox-no-autofill"
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={show}
