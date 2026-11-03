@@ -1,9 +1,13 @@
 import Link from "next/link";
+import { getUser } from "@/lib/auth";
 import { safeNext } from "@/lib/validation";
 import { login, requestCode } from "../actions";
+import { AlreadySignedIn } from "../already-signed-in";
 import { ErrorMessage } from "../error-message";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+  const user = await getUser();
+  if (user) return <AlreadySignedIn name={user.name} />;
   const { error, next } = await searchParams;
   const target = safeNext(next);
 

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { db, placeOrder, type CheckoutInfo } from "@/lib/db";
 import { startPayment } from "@/lib/zarinpal";
-import { endOtherSessions, endSession, requireUser, startSession } from "@/lib/auth";
+import { endOtherSessions, endSession, getUser, requireUser, startSession } from "@/lib/auth";
 import { getCart, setCart } from "@/lib/cart";
 import { clearFlash, setFlash } from "@/lib/flash";
 import { PROVINCES } from "@/lib/format";
@@ -101,7 +101,13 @@ async function goToGateway(orderId: number) {
   redirect(url);
 }
 
+/** Login and sign-up are for signed-out visitors; the pages show a modal instead, this stops a form posted anyway. */
+async function refuseIfSignedIn() {
+  if (await getUser()) redirect("/login");
+}
+
 export async function register(form: FormData) {
+  await refuseIfSignedIn();
   const next = safeNext(form.get("next"));
   const back = `/register?next=${encodeURIComponent(next)}`;
   const name = str(form, "name").replace(/\s+/g, " ");
@@ -134,6 +140,7 @@ export async function register(form: FormData) {
 }
 
 export async function login(form: FormData) {
+  await refuseIfSignedIn();
   const next = safeNext(form.get("next"));
   const back = `/login?next=${encodeURIComponent(next)}`;
   const email = str(form, "email").toLowerCase();
@@ -162,6 +169,7 @@ export async function requestCode(form: FormData) {
   const next = safeNext(form.get("next"));
   const back = purpose === "link" ? "/account" : `/login?next=${encodeURIComponent(next)}`;
   if (purpose === "link") await requireUser("/account");
+  else await refuseIfSignedIn();
   const phone = normalizePhone(str(form, "phone"));
   if (!phone) fail(back, "شماره موبایل معتبر نیست (مثال: 09121234567)");
   if (purpose === "link" && db.prepare("SELECT 1 FROM users WHERE phone = ?").get(phone)) fail(back, "این شماره برای حساب دیگری ثبت شده است");
@@ -179,6 +187,7 @@ export async function requestCode(form: FormData) {
 
 export async function verifyCode(form: FormData) {
   const purpose = purposeOf(form);
+  if (purpose === "login") await refuseIfSignedIn();
   const next = safeNext(form.get("next"));
   const phone = normalizePhone(str(form, "phone"));
   if (!phone) fail("/login", "شماره موبایل معتبر نیست");

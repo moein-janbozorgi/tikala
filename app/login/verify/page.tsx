@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { getUser } from "@/lib/auth";
 import { normalizePhone, safeNext } from "@/lib/validation";
 import { requestCode, verifyCode } from "../../actions";
+import { AlreadySignedIn } from "../../already-signed-in";
 import { ErrorMessage } from "../../error-message";
 
 export default async function VerifyPage({ searchParams }: PageProps<"/login/verify">) {
@@ -8,6 +10,9 @@ export default async function VerifyPage({ searchParams }: PageProps<"/login/ver
   const phone = normalizePhone(typeof params.phone === "string" ? params.phone : "") ?? "";
   const next = safeNext(params.next);
   const purpose = params.purpose === "link" ? "link" : "login";
+  // purpose=link is a signed-in user adding a phone from the account page, so only the login flow is blocked.
+  const user = purpose === "login" ? await getUser() : undefined;
+  if (user) return <AlreadySignedIn name={user.name} />;
   const error = typeof params.error === "string" ? params.error : undefined;
   const hidden = (
     <>

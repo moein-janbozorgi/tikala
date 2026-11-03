@@ -46,6 +46,16 @@ async function submitForm(path, marker, fields) {
 const outbox = () => { try { return readFileSync(join(dirname(process.env.DB_PATH), "sms-outbox.log"), "utf8"); } catch { return ""; } };
 const latestCode = (phone) => [...outbox().matchAll(new RegExp(`\\t${phone}\\tکد ورود تیکلا: ([0-9]{6})`, "g"))].at(-1)?.[1];
 const check = (cond, msg) => { console.log((cond ? "PASS " : "FAIL ") + msg); if (!cond) process.exitCode = 1; };
+/** Runs fn with no cookies (signed out), then puts the current session back. Login and register refuse signed-in users. */
+async function guest(fn) {
+  const saved = cookies;
+  cookies = {};
+  try {
+    return await fn();
+  } finally {
+    cookies = saved;
+  }
+}
 
 for (const p of ["/", "/product/1", "/cart", "/login", "/register"]) check((await get(p)).status === 200, `GET ${p} 200`);
 check((await get("/product/999")).status === 404, "unknown product 404");
@@ -63,8 +73,18 @@ r = await submit("/register?next=/cart", 1, { name: "تست", email, password: "
 check(r.location?.includes("error="), "short password rejected");
 r = await submit("/register?next=/cart", 1, { name: "تست", email, password: "password123", confirm: "password123", next: "/cart" });
 check(r.location === "/cart" && cookies.session, "register logs in and redirects to next");
-r = await submit("/register", 2, { name: "x", email, password: "password123", confirm: "password123", next: "/" });
+r = await guest(() => submit("/register", 1, { name: "x", email, password: "password123", confirm: "password123", next: "/" }));
 check(r.location?.includes("error="), "duplicate email rejected");
+
+// Signed in: login and register show a modal instead of their forms, and the login action itself refuses.
+const signedInLogin = (await get("/login")).html;
+const signedInRegister = (await get("/register")).html;
+check(signedInLogin.includes("شما وارد حساب کاربری شده‌اید") && !signedInLogin.includes('name="password"') && !signedInRegister.includes('name="confirm"'), "signed-in user gets the 'already signed in' modal, not the forms");
+const loginAction = (await guest(() => get("/login"))).html.match(/<form[\s\S]*?<\/form>/g).find((f) => f.includes('name="password"')).match(/name="(\$ACTION_ID_[^"]+)"/)[1];
+const loginPost = new FormData();
+for (const [k, v] of Object.entries({ [loginAction]: "", email, password: "password123", next: "/" })) loginPost.append(k, v);
+const refused = await fetch(base + "/login", { method: "POST", body: loginPost, headers: { cookie: cookieHeader(), origin: base }, redirect: "manual" });
+check(refused.headers.get("location") === "/login", "login action refuses a signed-in user");
 
 const productHtml = (await get("/product/1")).html;
 const variantId = Number(productHtml.match(/name="variantId" checked="" value="(\d+)"/)[1]);
@@ -149,7 +169,7 @@ check(!/<html[^>]*data-theme=/.test((await get("/")).html), "theme back to syste
 // Buy straight from a home-page card: forms are 0 logout, 1 theme, then one per in-stock product card.
 const home = (await get("/")).html;
 check(home.includes('aria-label="افزایش تعداد"') && home.includes('aria-label="کاهش تعداد"') && home.includes(">خرید</button>"), "cards show stepper and buy button");
-const cardVariant = home.match(/<select name="variantId"[^>]*><option value="(\d+)"/)[1];
+const cardVariant = home.match(/name="variantId" checked="" value="(\d+)"/)[1];
 r = await submit("/", 2, { variantId: cardVariant, qty: 3 });
 const cartQty = (html) => html.match(new RegExp(`name="variantId" value="${cardVariant}"/>[\\s\\S]*?aria-label="تعداد"[^>]*>([۰-۹]+)<`))?.[1];
 check(r.location === "/cart" && cartQty((await get("/cart")).html) === "۳", "card buy adds chosen quantity to cart");
@@ -164,8 +184,8 @@ check(cartQty(cartHtml) === "۱" && cartHtml.includes('aria-label="حذف از �
 r = await submitForm("/cart", `name="variantId" value="${cardVariant}"`, { variantId: cardVariant, qty: 0 });
 check(!(await get("/cart")).html.includes(`name="variantId" value="${cardVariant}"`), "remove button takes the item out of the cart");
 
-// Register form: name and email rules (logged in here, so forms are 0 logout, 1 theme, 2 register).
-const reg = (fields) => submit("/register", 2, { password: "password123", confirm: "password123", next: "/", ...fields });
+// Register form: name and email rules, as a guest (forms are 0 theme, 1 register); the admin session is kept.
+const reg = (fields) => guest(() => submit("/register", 1, { password: "password123", confirm: "password123", next: "/", ...fields }));
 r = await reg({ name: "علی123", email: `n1${email}` });
 check(decodeURIComponent(r.location ?? "").includes("نام باید"), "invalid name rejected");
 r = await reg({ name: "علی رضایی", email: "bad@example" });
@@ -181,20 +201,17 @@ check(saved?.name === "مریم\u200cالسادات احمدی", "name saved wit
 check((await get("/product/999")).html.includes("صفحه پیدا نشد") && (await get("/no-such-page")).html.includes("صفحه پیدا نشد"), "Persian 404 page");
 check((await get("/product/1")).html.includes("<title>تی‌شرت نخی ساده | تیکلا</title>"), "product page title has product name");
 
-// Login lockout: 5 failures in 15 minutes, then locked (unknown emails count too). Logged in: 0 logout, 1 theme, 2 login.
+// Login lockout: 5 failures in 15 minutes, then locked (unknown emails count too).
 const lockEmail = `lock${Date.now()}@test.com`;
-for (let i = 0; i < 5; i++) r = await submitForm("/login", 'name="password"', { email: lockEmail, password: "wrong-password1", next: "/" });
+const badLogin = () => guest(() => submitForm("/login", 'name="password"', { email: lockEmail, password: "wrong-password1", next: "/" }));
+for (let i = 0; i < 5; i++) r = await badLogin();
 check(decodeURIComponent(r.location ?? "").includes("اشتباه است"), "wrong password rejected");
-r = await submitForm("/login", 'name="password"', { email: lockEmail, password: "wrong-password1", next: "/" });
+r = await badLogin();
 check(decodeURIComponent(r.location ?? "").includes("تعداد تلاش بیش از حد"), "6th attempt is locked out");
 
 // ---------- SMS ----------
 await new Promise((r) => setTimeout(r, 300)); // notifications are sent just after the response
 check(outbox().includes("ثبت شد") && outbox().includes("پرداخت سفارش") && outbox().includes("ارسال شد"), "order SMS: placed, paid and shipped messages sent");
-
-// The register checks above left a new non-admin user signed in; switch back to the e2e admin.
-r = await submitForm("/login", 'name="password"', { email, password: "password123", next: "/" });
-check(r.location === "/", "signed back in as the e2e admin");
 
 // ---------- Search and pagination ----------
 const all = (await get("/")).html;
