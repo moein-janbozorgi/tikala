@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { getUser } from "@/lib/auth";
+import { resendWait } from "@/lib/otp";
 import { normalizePhone, safeNext } from "@/lib/validation";
 import { requestCode, verifyCode } from "../../actions";
 import { AlreadySignedIn } from "../../already-signed-in";
 import { ErrorMessage } from "../../error-message";
+import { ResendButton } from "./resend-button";
 
 export default async function VerifyPage({ searchParams }: PageProps<"/login/verify">) {
   const params = await searchParams;
@@ -13,6 +15,7 @@ export default async function VerifyPage({ searchParams }: PageProps<"/login/ver
   // purpose=link is a signed-in user adding a phone from the account page, so only the login flow is blocked.
   const user = purpose === "login" ? await getUser() : undefined;
   if (user) return <AlreadySignedIn name={user.name} />;
+  const wait = phone ? resendWait(phone) : 0;
   const error = typeof params.error === "string" ? params.error : undefined;
   const hidden = (
     <>
@@ -61,7 +64,8 @@ export default async function VerifyPage({ searchParams }: PageProps<"/login/ver
       <div className="flex justify-between border-t border-line pt-5 text-sm">
         <form action={requestCode}>
           {hidden}
-          <button className="text-accent hover:underline">ارسال دوباره کد</button>
+          {/* key: a new code (or any re-render) restarts the countdown from the server's value. */}
+          <ResendButton key={wait} wait={wait} />
         </form>
         <Link href={purpose === "link" ? "/account" : `/login?next=${encodeURIComponent(next)}`} className="text-muted hover:text-ink">
           تغییر شماره

@@ -299,6 +299,7 @@ await submitForm("/", "خروج", {});
 const p2 = "09350000002";
 r = await submitForm("/login", 'value="login"', { purpose: "login", next: "/", phone: p2 });
 const verifyUrl = r.location;
+check(/<button disabled=""[^>]*>ارسال دوباره کد تا/.test((await get(verifyUrl)).html), "resend button starts disabled with a countdown");
 r = await submitForm(verifyUrl, 'name="code"', { phone: p2, next: "/", purpose: "login", code: latestCode(p2) === "000000" ? "111111" : "000000" });
 check(decodeURIComponent(r.location ?? "").includes("اشتباه"), "wrong SMS code rejected");
 r = await submitForm(verifyUrl, 'name="code"', { phone: p2, next: "/", purpose: "login", code: latestCode(p2), name: "" });

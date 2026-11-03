@@ -123,7 +123,7 @@ test("phones and postal codes accept Persian digits and common prefixes", async 
 });
 
 test("SMS codes: right code passes, wrong ones count, 3 tries, 3-minute expiry, resend and hourly limits", async () => {
-  const { checkCode, consumeCode, createCode, smsAllowedForIp } = await import("../lib/otp.ts");
+  const { checkCode, consumeCode, createCode, resendWait, smsAllowedForIp } = await import("../lib/otp.ts");
   const phone = "09120000001";
   let t = 2_000_000_000_000;
   const code = createCode(phone, t);
@@ -135,6 +135,9 @@ test("SMS codes: right code passes, wrong ones count, 3 tries, 3-minute expiry, 
   assert.notEqual(checkCode(phone, code, t), null, "consumed code is gone");
 
   assert.throws(() => createCode("09120000002", t) && createCode("09120000002", t + 30_000), /صبر کنید/, "resend needs 1 minute");
+  assert.equal(resendWait("09120000002", t + 30_000), 30, "countdown shows the seconds left");
+  assert.equal(resendWait("09120000002", t + 61_000), 0, "no wait after a minute");
+  assert.equal(resendWait("09129999999", t), 0, "no wait for a phone that never got a code");
   const late = createCode("09120000003", t);
   assert.notEqual(checkCode("09120000003", late, t + 3 * 60_000 + 1), null, "expired after 3 minutes");
 

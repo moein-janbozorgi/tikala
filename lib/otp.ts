@@ -14,12 +14,17 @@ const hash = (phone: string, code: string) => createHash("sha256").update(`${pho
 type Row = { code_hash: string; sent_at: number; expires_at: number; attempts: number; window_start: number; sends: number };
 const row = (phone: string) => db.prepare("SELECT * FROM otp_codes WHERE phone = ?").get(phone) as Row | undefined;
 
+/** Seconds until the phone may get a new code; 0 when it can now. */
+export function resendWait(phone: string, now = Date.now()) {
+  const prev = row(phone);
+  return prev ? Math.max(0, Math.ceil((RESEND_AFTER - (now - prev.sent_at)) / 1000)) : 0;
+}
+
 /** Makes a new code for the phone and returns it. Throws a Persian message when the phone must wait. */
 export function createCode(phone: string, now = Date.now()) {
   const prev = row(phone);
-  if (prev && now - prev.sent_at < RESEND_AFTER) {
-    throw new Error(`برای دریافت کد جدید ${Math.ceil((RESEND_AFTER - (now - prev.sent_at)) / 1000).toLocaleString("fa-IR")} ثانیه صبر کنید`);
-  }
+  const wait = resendWait(phone, now);
+  if (wait) throw new Error(`برای دریافت کد جدید ${wait.toLocaleString("fa-IR")} ثانیه صبر کنید`);
   const sameHour = prev && now - prev.window_start < HOUR;
   if (sameHour && prev.sends >= MAX_SENDS_PER_HOUR) throw new Error("تعداد درخواست کد بیش از حد مجاز است؛ یک ساعت دیگر تلاش کنید");
 
