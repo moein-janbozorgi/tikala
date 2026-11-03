@@ -223,7 +223,7 @@ check(all.includes(`href="${bootsLink.replace("&", "&amp;")}"`) && all.includes(
 const boots = (await get(bootsLink)).html;
 check(cards(boots) === 1 && boots.includes("بوت چرم قهوه‌ای سوخته") && !boots.includes("نوع:") && !all.includes(" کالا<"), "type filter shows only that type; types and counts live only in the menu");
 const page2 = (await get("/?page=2")).html;
-check(cards(page2) === 24 && page2.includes("کالکشن فصل"), "?page=2 grows the list to 24, banner stays (infinite scroll)");
+check(cards(page2) === 24 && page2.includes("استایل هر روزت را این‌جا پیدا کن"), "?page=2 grows the list to 24, banner stays (infinite scroll)");
 const found = (await get("/?q=" + encodeURIComponent("هودي"))).html; // Arabic ي on purpose
 check(found.includes("هودی مشکی طرح جمجمه") && !found.includes("شلوار جین مشکی اسلیم") && found.includes("نتیجه برای"), "search finds hoodies (Arabic ي normalized)");
 check((await get("/?q=" + encodeURIComponent("%"))).html.includes("محصولی یافت نشد"), "search treats % literally");
@@ -251,7 +251,8 @@ check((await fetch(base + "/uploads/..%2Fshop.db")).status === 404, "upload rout
 // ---------- Admin: categories, deleting products, order filters ----------
 const err = (res) => decodeURIComponent(res.location ?? "");
 r = await submitForm("/admin/categories", 'placeholder="مثلاً: کیف"', { name: "کیف" });
-check(r.location === "/admin/categories?saved=1" && (await get("/admin/products/new")).html.includes("<option>کیف</option>"), "admin adds a category, offered in the product form");
+// The category field is a client-side combobox: its options are only in the page's React payload, as a quoted string.
+check(r.location === "/admin/categories?saved=1" && /\\?"کیف\\?"/.test((await get("/admin/products/new")).html), "admin adds a category, offered in the product form");
 r = await submitForm("/admin/categories", 'placeholder="مثلاً: کیف"', { name: "کیف" });
 check(err(r).includes("از قبل وجود دارد"), "duplicate category rejected");
 r = await submitForm("/admin/categories", 'name="from" value="کیف"', { from: "کیف", name: "کیف و کوله" });
