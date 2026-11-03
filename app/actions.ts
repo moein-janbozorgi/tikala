@@ -44,6 +44,7 @@ export async function updateCartItem(form: FormData) {
 
 /** The visitor's IP. Runs behind Nginx, whose $proxy_add_x_forwarded_for appends the real client IP last; earlier entries can be forged. */
 const clientIp = async () => (await headers()).get("x-forwarded-for")?.split(",").at(-1)?.trim() || "unknown";
+const LOCKED = "تعداد تلاش بیش از حد مجاز است؛ ۱۵ دقیقه دیگر دوباره تلاش کنید";
 
 /** Like fail(), but first saves what the user typed so the form comes back filled in. */
 async function failWithValues(path: string, message: string, form: string, values: Record<string, string>): Promise<never> {
@@ -130,13 +131,14 @@ export async function login(form: FormData) {
   const back = `/login?next=${encodeURIComponent(next)}`;
   const email = str(form, "email").toLowerCase();
   // Checked before the password, and unknown emails count too, so the lock reveals nothing about which accounts exist.
-  if (loginLocked(email)) fail(back, "تعداد تلاش بیش از حد مجاز است؛ ۱۵ دقیقه دیگر دوباره تلاش کنید");
+  const ip = await clientIp();
+  if (loginLocked(email, ip)) fail(back, LOCKED);
   const user = db.prepare("SELECT id, password_hash FROM users WHERE email = ?").get(email) as
     | { id: number; password_hash: string | null }
     | undefined;
   // Accounts created by phone have no password until the owner sets one in their account page.
   if (!user?.password_hash || !(await verifyPassword(String(form.get("password") ?? ""), user.password_hash))) {
-    recordLoginFailure(email);
+    recordLoginFailure(email, ip);
     fail(back, "ایمیل یا رمز عبور اشتباه است");
   }
   clearLoginFailures(email);

@@ -166,14 +166,20 @@ test("passwords verify only with the right password", async () => {
 
 test("login locks after 5 failures in 15 minutes and unlocks after", () => {
   const t = 1_000_000_000;
-  for (let i = 0; i < 4; i++) recordLoginFailure("x@y.zz", t + i);
-  assert.ok(!loginLocked("x@y.zz", t + 10), "4 failures: still open");
-  recordLoginFailure("x@y.zz", t + 5);
-  assert.ok(loginLocked("x@y.zz", t + 10), "5 failures: locked");
-  assert.ok(!loginLocked("x@y.zz", t + 15 * 60 * 1000 + 10), "window passed: open again");
-  for (let i = 0; i < 5; i++) recordLoginFailure("a@b.cc", t);
+  const ip = "1.1.1.1";
+  for (let i = 0; i < 4; i++) recordLoginFailure("x@y.zz", ip, t + i);
+  assert.ok(!loginLocked("x@y.zz", ip, t + 10), "4 failures: still open");
+  recordLoginFailure("x@y.zz", ip, t + 5);
+  assert.ok(loginLocked("x@y.zz", ip, t + 10), "5 failures: locked");
+  assert.ok(!loginLocked("x@y.zz", "2.2.2.2", t + 10), "an attacker's failures don't lock the owner out on their own IP");
+  assert.ok(!loginLocked("x@y.zz", ip, t + 15 * 60 * 1000 + 10), "window passed: open again");
+  for (let i = 0; i < 5; i++) recordLoginFailure("a@b.cc", ip, t);
   clearLoginFailures("a@b.cc");
-  assert.ok(!loginLocked("a@b.cc", t), "successful login clears");
+  assert.ok(!loginLocked("a@b.cc", ip, t), "successful login clears");
+
+  const sprayer = "3.3.3.3";
+  for (let i = 0; i < 20; i++) recordLoginFailure(`user${i}@b.cc`, sprayer, t);
+  assert.ok(loginLocked("someone-new@b.cc", sprayer, t + 10), "20 failures from one IP lock that IP for every email");
 });
 
 test("unpaid online orders expire after 30 minutes and return stock", () => {
