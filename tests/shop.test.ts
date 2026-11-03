@@ -205,3 +205,11 @@ test("unpaid online orders expire after 30 minutes and return stock", () => {
   assert.equal(status(fresh), "awaiting_payment");
   assert.equal(stockOf(v.id), v.stock - 1, "only the expired order's item came back");
 });
+
+test("every province has its city list", async () => {
+  const { CITIES } = await import("../lib/cities.ts");
+  const { PROVINCES } = await import("../lib/format.ts");
+  assert.deepEqual(Object.keys(CITIES).sort(), [...PROVINCES].sort());
+  for (const p of PROVINCES) assert.ok(CITIES[p].length > 0, p);
+  assert.ok(CITIES["تهران"].includes("تهران") && CITIES["اصفهان"].includes("کاشان"));
+});

@@ -2,8 +2,9 @@ import Link from "next/link";
 import { getUser } from "@/lib/auth";
 import { getCartLines } from "@/lib/cart";
 import { getFlash } from "@/lib/flash";
-import { PROVINCES, toman } from "@/lib/format";
+import { toman } from "@/lib/format";
 import { checkout, updateCartItem } from "../actions";
+import { AddressFields } from "./address-fields";
 import { ErrorMessage } from "../error-message";
 import { BagIcon, MinusIcon, PlusIcon, TrashIcon } from "../icons";
 import { ProductImage } from "../product-image";
@@ -127,21 +128,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
               />
             </label>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium">استان</span>
-                <select name="province" defaultValue={typed.province ?? ""} required className="input">
-                  <option value="" disabled>
-                    انتخاب کنید
-                  </option>
-                  {PROVINCES.map((p) => (
-                    <option key={p}>{p}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium">شهر</span>
-                <input name="city" defaultValue={typed.city} required maxLength={40} autoComplete="address-level2" className="input" />
-              </label>
+              <AddressFields province={typed.province} city={typed.city} />
             </div>
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium">آدرس کامل</span>

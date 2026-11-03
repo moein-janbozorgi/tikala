@@ -23,6 +23,9 @@ export async function saveProduct(form: FormData) {
   const back = id ? `/admin/products/${id}` : "/admin/products/new";
   if (!name || !(price > 0)) fail(back, "نام و قیمت معتبر وارد کنید");
   if (image && !/^(https?:\/\/|\/)/.test(image)) fail(back, "آدرس تصویر معتبر نیست");
+  // The category field is free text, so a new name must pass the same rule as the categories page.
+  const categoryError = category ? categoryProblem(category) : null;
+  if (categoryError) fail(back, categoryError);
   // An uploaded file wins over the URL field.
   const file = form.get("imageFile");
   if (file instanceof File && file.size > 0) {

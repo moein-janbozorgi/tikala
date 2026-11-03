@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Combobox } from "../../combobox";
 
-/** Category select + type input; the type suggestions follow the selected category. */
+/** Category + type comboboxes; the type suggestions follow the chosen category. Typing a new name creates it on save. */
 export function CategoryFields({
   categories,
   types,
@@ -16,32 +17,32 @@ export function CategoryFields({
   subcategory: string;
 }) {
   const [category, setCategory] = useState(initialCategory);
+  const [type, setType] = useState(subcategory);
   return (
     <>
-      <label className="block">
-        <span className="mb-1 flex justify-between text-sm">
-          دسته‌بندی
-          <Link href="/admin/categories" className="text-xs text-accent hover:underline">
-            + دسته جدید
+      <Combobox
+        name="category"
+        label="دسته‌بندی"
+        extra={
+          <Link href="/admin/categories" className="text-xs font-normal text-accent hover:underline">
+            + مدیریت دسته‌ها
           </Link>
-        </span>
-        <select name="category" value={category} onChange={(e) => setCategory(e.target.value)} className="input">
-          <option value="">بدون دسته‌بندی</option>
-          {categories.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-      </label>
-      <label className="block">
-        <span className="mb-1 block text-sm">نوع (زیردسته)</span>
-        {/* Suggests the types already used in this category; typing a new one creates it. */}
-        <input name="subcategory" defaultValue={subcategory} list="product-types" placeholder="مثلاً: کتانی" className="input" />
-        <datalist id="product-types">
-          {(types[category] ?? []).map((t) => (
-            <option key={t} value={t} />
-          ))}
-        </datalist>
-      </label>
+        }
+        placeholder="بدون دسته‌بندی"
+        hint={(t) => `دسته جدید «${t}» ساخته می‌شود.`}
+        options={categories}
+        value={category}
+        onChange={setCategory}
+      />
+      <Combobox
+        name="subcategory"
+        label="نوع (زیردسته)"
+        placeholder="مثلاً: کتانی"
+        hint={(t) => `نوع جدید «${t}» ساخته می‌شود.`}
+        options={types[category.trim()] ?? []}
+        value={type}
+        onChange={setType}
+      />
     </>
   );
 }
