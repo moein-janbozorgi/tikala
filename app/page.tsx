@@ -76,7 +76,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     <>
       <ErrorMessage error={typeof params.error === "string" ? params.error : undefined} />
       {category || q ? null : (
-        <section className="mb-10 flex items-center justify-between gap-6 rounded-3xl bg-brand px-6 py-12 text-brand-ink sm:px-12 sm:py-16">
+        <section className="mb-10 flex flex-col-reverse items-start justify-between gap-6 sm:flex-row sm:items-center rounded-3xl bg-brand px-6 py-12 text-brand-ink sm:px-12 sm:py-16">
           <div>
             <p className="mb-4 inline-block rounded-full bg-brand-ink px-3 py-1 text-xs font-bold text-brand">بوتیک آنلاین تیکلا</p>
             <h1 className="max-w-lg font-display text-4xl leading-tight sm:text-6xl sm:leading-tight">استایل هر روزت را این‌جا پیدا کن</h1>
@@ -93,7 +93,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               ))}
             </ul>
           </div>
-          <div className="hidden size-44 shrink-0 place-items-center rounded-full bg-white p-7 shadow-lg shadow-brand-ink/10 sm:grid">
+          <div className="grid size-20 shrink-0 place-items-center rounded-full bg-white p-3 shadow-lg shadow-brand-ink/10 sm:size-44 sm:p-7">
             <BagCheckArt className="size-full" />
           </div>
         </section>
