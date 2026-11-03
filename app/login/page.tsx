@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <input type="hidden" name="purpose" value="login" />
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium">شماره موبایل</span>
-          <input name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" placeholder="09121234567" required className="input text-right" />
+          <input name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" placeholder="09121234567" required data-check="phone" className="input text-right" />
           <FieldError name="phone" label="شماره موبایل" />
         </label>
         <button className="btn w-full">دریافت کد ورود</button>

@@ -1,15 +1,23 @@
 "use client";
 
 import { createContext, useContext, useRef, useState } from "react";
+import { normalizePhone } from "@/lib/phone";
 
 type Field = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 // Per field name: true = left empty, a string = a ready message for any other problem.
 type Errors = Record<string, true | string>;
 const Ctx = createContext<{ errors: Errors; recheck: (name: string) => void }>({ errors: {}, recheck: () => {} });
 
+// data-check="<name>": a rule shared with the server, which the HTML attributes can't express.
+const CHECKS: Record<string, (value: string) => string | undefined> = {
+  phone: (v) => (normalizePhone(v) ? undefined : "شماره موبایل معتبر نیست (مثال: 09121234567)"),
+};
+
 function problem(el: Field): true | string | undefined {
   const v = el.validity;
   if (v.valueMissing) return true;
+  const custom = el.dataset.check && CHECKS[el.dataset.check]?.(el.value);
+  if (custom) return custom;
   // data-match="password": this field must repeat that one (a password confirmation).
   const other = el.dataset.match && el.form?.elements.namedItem(el.dataset.match);
   if (other && "value" in other && other.value !== el.value) return el.dataset.matchMessage ?? "مقدار تکرار یکسان نیست.";
