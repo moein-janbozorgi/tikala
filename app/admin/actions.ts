@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { notifyOrder } from "@/lib/sms";
-import { cancelOrder, db, saveVariants, transaction } from "@/lib/db";
+import { cancelOrder, db, purgeOrder, saveVariants, transaction } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { ORDER_STATUSES } from "@/lib/format";
 import { saveUpload } from "@/lib/uploads";
@@ -103,5 +103,12 @@ export async function setOrderStatus(form: FormData) {
     const changed = db.prepare("UPDATE orders SET status = ? WHERE id = ? AND status NOT IN ('cancelled', ?)").run(status, id, status).changes;
     if (changed && status === "shipped") after(() => notifyOrder(id, "shipped"));
   }
+  redirect(back.startsWith("/admin") ? back : "/admin");
+}
+
+export async function deleteOrder(form: FormData) {
+  await requireAdmin();
+  const back = String(form.get("back") ?? "");
+  purgeOrder(Number(form.get("id")));
   redirect(back.startsWith("/admin") ? back : "/admin");
 }

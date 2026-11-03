@@ -4,7 +4,11 @@ import { requireAdmin } from "@/lib/auth";
 import { ORDER_STATUSES, toman } from "@/lib/format";
 import { toLatinDigits } from "@/lib/validation";
 import { OrderCard, type Order } from "../order-card";
-import { setOrderStatus } from "./actions";
+import { deleteOrder, setOrderStatus } from "./actions";
+import { ConfirmButton } from "./confirm-button";
+
+// The normal path of an order; any step can be clicked to jump to it.
+const STEPS = ["pending", "processing", "shipped", "delivered"];
 
 // Iran has no daylight saving time (since 2022), so "today" is UTC+3:30 all year.
 const TEHRAN = "'+210 minutes'";
@@ -89,23 +93,52 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
       {orders.length === 0 ? <p className="py-10 text-center text-muted">سفارشی پیدا نشد.</p> : null}
       {orders.map((o) => (
         <OrderCard key={o.id} order={o}>
-          {o.status === "cancelled" ? null : (
-            <form action={setOrderStatus} className="flex gap-2">
-              <input type="hidden" name="id" value={o.id} />
-              <input type="hidden" name="back" value={here} />
-              <select name="status" defaultValue={o.status} aria-label="وضعیت" className="input w-auto">
-                {Object.entries(ORDER_STATUSES)
-                  // Only checkout sets "awaiting payment"; it stays listed just for orders that are in it.
-                  .filter(([value]) => value !== "awaiting_payment" || o.status === value)
-                  .map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-              </select>
-              <button className="btn">ذخیره</button>
-            </form>
-          )}
+          <form action={setOrderStatus} className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+            <input type="hidden" name="id" value={o.id} />
+            <input type="hidden" name="back" value={here} />
+            {o.status === "cancelled" ? null : (
+              <ol aria-label="مراحل سفارش" className="flex flex-wrap items-center gap-1">
+                {/* Only checkout sets "awaiting payment"; it is shown just for orders that are in it. */}
+                {(o.status === "awaiting_payment" ? ["awaiting_payment", ...STEPS] : STEPS).map((s, i, steps) => {
+                  const at = steps.indexOf(o.status);
+                  return (
+                    <li key={s} className="flex items-center gap-1">
+                      {i > 0 ? <span aria-hidden className={`h-0.5 w-3 rounded-full ${i <= at ? "bg-ink" : "bg-line"}`} /> : null}
+                      <button
+                        name="status"
+                        value={s}
+                        disabled={i === at}
+                        aria-current={i === at ? "step" : undefined}
+                        className={`chip gap-1 px-3 py-1.5 text-xs disabled:cursor-default ${i === at ? "chip-active" : i < at ? `badge tone-${s} border-transparent` : "text-muted"}`}
+                      >
+                        {i < at ? <span aria-hidden>✓</span> : null}
+                        {ORDER_STATUSES[s]}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+            <div className="ms-auto flex gap-2">
+              {o.status === "cancelled" ? null : (
+                <ConfirmButton
+                  name="status"
+                  value="cancelled"
+                  message={`سفارش #${o.id.toLocaleString("fa-IR")} لغو شود؟ اقلام به انبار برمی‌گردند و لغو قابل بازگشت نیست.`}
+                  className="btn-ghost px-3 py-1.5 text-xs"
+                >
+                  لغو سفارش
+                </ConfirmButton>
+              )}
+              <ConfirmButton
+                formAction={deleteOrder}
+                message={`سفارش #${o.id.toLocaleString("fa-IR")} برای همیشه از پایگاه داده حذف شود؟ این کار قابل بازگشت نیست.`}
+                className="btn-ghost px-3 py-1.5 text-xs text-danger hover:bg-danger/10"
+              >
+                حذف
+              </ConfirmButton>
+            </div>
+          </form>
         </OrderCard>
       ))}
     </div>

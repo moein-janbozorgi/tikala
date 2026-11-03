@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 process.env.DB_PATH = ":memory:";
-const { db, cancelOrder, expireUnpaidOrders, parseVariants, placeOrder } = await import("../lib/db.ts");
+const { db, cancelOrder, expireUnpaidOrders, parseVariants, placeOrder, purgeOrder } = await import("../lib/db.ts");
 const { clearLoginFailures, hashPassword, loginLocked, passwordProblem, recordLoginFailure, verifyPassword } = await import("../lib/password.ts");
 
 const user = db.prepare("INSERT INTO users (name, email, password_hash) VALUES ('t', 't@t.t', 'x') RETURNING id").get() as { id: number };
@@ -61,6 +61,18 @@ test("online orders await payment, and cancelling returns stock exactly once", (
   cancelOrder(orderId);
   cancelOrder(orderId);
   assert.equal(stockOf(v.id), v.stock);
+});
+
+test("purgeOrder deletes the order and its items, returning stock only if it hadn't shipped", () => {
+  const v = db.prepare("SELECT id, stock FROM variants WHERE stock >= 2 LIMIT 1").get() as { id: number; stock: number };
+  const open = placeOrder(user.id, { [v.id]: 1 }, info);
+  const shipped = placeOrder(user.id, { [v.id]: 1 }, info);
+  db.prepare("UPDATE orders SET status = 'shipped' WHERE id = ?").run(shipped);
+  purgeOrder(open);
+  purgeOrder(shipped);
+  assert.equal(stockOf(v.id), v.stock - 1);
+  assert.equal(db.prepare("SELECT 1 FROM orders WHERE id IN (?, ?)").get(open, shipped), undefined);
+  assert.equal(db.prepare("SELECT 1 FROM order_items WHERE order_id IN (?, ?)").get(open, shipped), undefined);
 });
 
 test("every sample product has a photo file and parseable variants", async () => {

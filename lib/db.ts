@@ -279,6 +279,15 @@ export function cancelOrder(orderId: number) {
   });
 }
 
+/** Deletes an order and its items for good. One that hasn't shipped is cancelled first, so its items go back in stock. */
+export function purgeOrder(orderId: number) {
+  transaction(() => {
+    const order = db.prepare("SELECT status FROM orders WHERE id = ?").get(orderId) as { status: string } | undefined;
+    if (order && ["awaiting_payment", "pending", "processing"].includes(order.status)) cancelOrder(orderId);
+    db.prepare("DELETE FROM orders WHERE id = ?").run(orderId); // order_items go with it (ON DELETE CASCADE)
+  });
+}
+
 // Sample products so a fresh install isn't empty. Inside a transaction because build workers import this in parallel.
 transaction(() => {
   if (db.prepare("SELECT 1 FROM products LIMIT 1").get()) return;
