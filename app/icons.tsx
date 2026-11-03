@@ -45,3 +45,18 @@ export const UserIcon = () => (
     <path d="M4 20a8 8 0 0 1 16 0" />
   </Icon>
 );
+export const MenuIcon = () => (
+  <Icon>
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </Icon>
+);
+export const CloseIcon = () => (
+  <Icon>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </Icon>
+);
+export const TrashIcon = () => (
+  <Icon>
+    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+  </Icon>
+);

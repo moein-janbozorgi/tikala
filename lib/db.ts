@@ -72,6 +72,7 @@ export type Product = {
   name: string;
   description: string;
   category: string;
+  subcategory: string;
   price: number;
   image: string;
   active: number;
@@ -92,8 +93,9 @@ export function transaction<T>(fn: () => T): T {
 }
 
 // Schema changes after the first release; user_version records which have run.
+const schemaVersion = () => (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
 transaction(() => {
-  if ((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version < 1) {
+  if (schemaVersion() < 1) {
     db.exec(`
       ALTER TABLE orders ADD COLUMN payment TEXT NOT NULL DEFAULT 'cod';
       ALTER TABLE orders ADD COLUMN authority TEXT;
@@ -102,6 +104,76 @@ transaction(() => {
       PRAGMA user_version = 1;
     `);
   }
+});
+
+// v2: accounts can be phone-only (email and password become optional), orders get structured address fields, and
+// one-time SMS codes get a table. SQLite can't relax NOT NULL in place, so users is rebuilt the documented way
+// (new table, copy, drop, rename) with foreign keys off; that pragma is ignored inside a transaction, so it wraps it.
+if (schemaVersion() < 2) {
+  db.exec("PRAGMA foreign_keys = OFF");
+  try {
+    transaction(() => {
+      if (schemaVersion() >= 2) return; // another build worker migrated first
+      db.exec(`
+        CREATE TABLE users_v2 (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT UNIQUE,
+          phone TEXT UNIQUE,
+          password_hash TEXT,
+          is_admin INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO users_v2 (id, name, email, password_hash, is_admin, created_at)
+          SELECT id, name, email, password_hash, is_admin, created_at FROM users;
+        DROP TABLE users;
+        ALTER TABLE users_v2 RENAME TO users;
+        ALTER TABLE orders ADD COLUMN province TEXT NOT NULL DEFAULT '';
+        ALTER TABLE orders ADD COLUMN city TEXT NOT NULL DEFAULT '';
+        ALTER TABLE orders ADD COLUMN postal_code TEXT NOT NULL DEFAULT '';
+        CREATE TABLE otp_codes (
+          phone TEXT PRIMARY KEY,
+          code_hash TEXT NOT NULL,
+          sent_at INTEGER NOT NULL,
+          expires_at INTEGER NOT NULL,
+          attempts INTEGER NOT NULL DEFAULT 0
+        );
+        PRAGMA user_version = 2;
+      `);
+      if (db.prepare("PRAGMA foreign_key_check").all().length) throw new Error("users migration broke a foreign key");
+    });
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+// v3: an hourly cap on SMS codes per phone, so nobody can flood a number (or the shop's SMS bill).
+transaction(() => {
+  if (schemaVersion() >= 3) return;
+  db.exec(`
+    ALTER TABLE otp_codes ADD COLUMN window_start INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE otp_codes ADD COLUMN sends INTEGER NOT NULL DEFAULT 0;
+    PRAGMA user_version = 3;
+  `);
+});
+
+// v4: products get a type (subcategory) for the side menu. Existing sample products get theirs by name; others stay ''.
+transaction(() => {
+  if (schemaVersion() >= 4) return;
+  db.exec("ALTER TABLE products ADD COLUMN subcategory TEXT NOT NULL DEFAULT ''");
+  const backfill = db.prepare("UPDATE products SET subcategory = ? WHERE name = ? AND category = ?");
+  for (const [name, , category, subcategory] of SAMPLE_PRODUCTS) backfill.run(subcategory, name, category);
+  db.exec("PRAGMA user_version = 4");
+});
+
+// v5: categories get their own table, so the admin can create one before it has products, rename it and pick it from a list.
+transaction(() => {
+  if (schemaVersion() >= 5) return;
+  db.exec(`
+    CREATE TABLE categories (name TEXT PRIMARY KEY);
+    INSERT INTO categories (name) SELECT DISTINCT category FROM products WHERE category != '';
+    PRAGMA user_version = 5;
+  `);
 });
 
 /** Parses admin input lines like "M | مشکی | 10" into variants. */
@@ -133,7 +205,7 @@ export function saveVariants(productId: number, text: string) {
   });
 }
 
-export type CheckoutInfo = { name: string; phone: string; address: string };
+export type CheckoutInfo = { name: string; phone: string; province: string; city: string; postal_code: string; address: string };
 
 /**
  * Creates an order from cart {variantId: qty}, decrementing stock atomically. Throws a Persian message on failure.
@@ -152,7 +224,7 @@ export function placeOrder(userId: number, cart: Record<string, number>, info: C
            JOIN products p ON p.id = v.product_id WHERE v.id = ? AND p.active = 1`,
         )
         .get(Number(variantId)) as { id: number; size: string; color: string; stock: number; name: string; price: number } | undefined;
-      if (!v) throw new Error("یکی از کالاهای سبد دیگر موجود نیست");
+      if (!v) continue; // deleted or hidden by the admin: the cart page no longer shows it either, so skip rather than block checkout
       if (v.stock < qty) throw new Error(`موجودی «${v.name}» (${v.size} / ${v.color}) کافی نیست`);
       total += v.price * qty;
       items.push({ ...v, qty });
@@ -160,10 +232,22 @@ export function placeOrder(userId: number, cart: Record<string, number>, info: C
     if (items.length === 0) throw new Error("سبد خرید خالی است");
 
     const order = db
-      .prepare("INSERT INTO orders (user_id, total, name, phone, address, payment, status) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id")
-      .get(userId, total, info.name, info.phone, info.address, payment, payment === "online" ? "awaiting_payment" : "pending") as {
-      id: number;
-    };
+      .prepare(
+        `INSERT INTO orders (user_id, total, name, phone, province, city, postal_code, address, payment, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+      )
+      .get(
+        userId,
+        total,
+        info.name,
+        info.phone,
+        info.province,
+        info.city,
+        info.postal_code,
+        info.address,
+        payment,
+        payment === "online" ? "awaiting_payment" : "pending",
+      ) as { id: number };
     for (const it of items) {
       db.prepare("UPDATE variants SET stock = stock - ? WHERE id = ?").run(it.qty, it.id);
       db.prepare(
@@ -198,10 +282,11 @@ export function cancelOrder(orderId: number) {
 // Sample products so a fresh install isn't empty. Inside a transaction because build workers import this in parallel.
 transaction(() => {
   if (db.prepare("SELECT 1 FROM products LIMIT 1").get()) return;
-  for (const [name, description, category, price, image, variants] of SAMPLE_PRODUCTS) {
+  for (const [name, description, category, subcategory, price, image, variants] of SAMPLE_PRODUCTS) {
     const p = db
-      .prepare("INSERT INTO products (name, description, category, price, image) VALUES (?, ?, ?, ?, ?) RETURNING id")
-      .get(name, description, category, price, image) as { id: number };
+      .prepare("INSERT INTO products (name, description, category, subcategory, price, image) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")
+      .get(name, description, category, subcategory, price, image) as { id: number };
     saveVariants(p.id, variants);
+    db.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(category);
   }
 });

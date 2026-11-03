@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { safeNext } from "@/lib/auth";
+import { getFlash } from "@/lib/flash";
 import { register } from "../actions";
 import { ErrorMessage } from "../error-message";
 
 export default async function RegisterPage({ searchParams }: PageProps<"/register">) {
   const { error, next } = await searchParams;
+  const typed = await getFlash("register");
   const target = safeNext(next);
 
   return (
@@ -19,6 +21,7 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
         <span className="mb-1.5 block text-sm font-medium">نام و نام خانوادگی</span>
         <input
           name="name"
+          defaultValue={typed.name}
           autoComplete="name"
           required
           maxLength={50}
@@ -32,6 +35,7 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
         <span className="mb-1.5 block text-sm font-medium">ایمیل</span>
         <input
           name="email"
+          defaultValue={typed.email}
           type="email"
           autoComplete="email"
           dir="ltr"

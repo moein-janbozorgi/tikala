@@ -3,7 +3,11 @@ import { redirect } from "next/navigation";
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "./db";
 
-export type User = { id: number; name: string; email: string; is_admin: number };
+export type User = { id: number; name: string; email: string | null; phone: string | null; has_password: number; is_admin: number };
+
+// The only account allowed into the admin panel: whichever one has this verified mobile number. Owning the number is
+// proven by an SMS code (phone login, or linking it in the account page), so no one else can take it over.
+const ADMIN_PHONE = process.env.ADMIN_PHONE ?? "09370952694";
 
 const COOKIE = "session";
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days, in seconds
@@ -39,10 +43,11 @@ export async function getUser() {
   if (!token) return undefined;
   return db
     .prepare(
-      `SELECT u.id, u.name, u.email, u.is_admin FROM sessions s JOIN users u ON u.id = s.user_id
+      `SELECT u.id, u.name, u.email, u.phone, u.password_hash IS NOT NULL AS has_password, u.phone IS ? AS is_admin
+       FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > ?`,
     )
-    .get(sha(token), Date.now()) as User | undefined;
+    .get(ADMIN_PHONE, sha(token), Date.now()) as User | undefined;
 }
 
 export async function requireUser(next: string) {

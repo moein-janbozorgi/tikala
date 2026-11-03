@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --test --no-warnings tests/shop.test.ts",
-    "test:e2e": "node --no-warnings tests/e2e.mjs",
-    "make-admin": "node --no-warnings scripts/make-admin.ts"
+    "test:e2e": "node --no-warnings tests/e2e.mjs"
   },
   "dependencies": {
     "next": "16.4.4",

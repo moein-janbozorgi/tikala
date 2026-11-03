@@ -23,6 +23,7 @@
 # database (contains customer data), and throwaway test databases
 /data/
 /tmp/
+sms-outbox.log
 
 # personal Claude Code settings for this machine
 .claude/settings.local.json

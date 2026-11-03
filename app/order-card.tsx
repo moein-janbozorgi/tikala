@@ -7,6 +7,9 @@ export type Order = {
   total: number;
   name: string;
   phone: string;
+  province: string;
+  city: string;
+  postal_code: string;
   address: string;
   created_at: string;
   payment: string;
@@ -16,7 +19,7 @@ export type Order = {
 type Item = { id: number; product_name: string; size: string; color: string; price: number; qty: number };
 
 /** Order summary shared by the customer's account page and the admin panel; `children` holds extra controls. */
-export function OrderCard({ order, showCustomer, children }: { order: Order; showCustomer?: boolean; children?: React.ReactNode }) {
+export function OrderCard({ order, children }: { order: Order; children?: React.ReactNode }) {
   const items = db.prepare("SELECT * FROM order_items WHERE order_id = ?").all(order.id) as Item[];
   return (
     <div className="card space-y-3">
@@ -42,11 +45,15 @@ export function OrderCard({ order, showCustomer, children }: { order: Order; sho
           </>
         ) : null}
       </p>
-      {showCustomer ? (
-        <p className="border-t border-line pt-3 text-sm">
-          {order.name} — <span dir="ltr">{order.phone}</span> — {order.address}
-        </p>
-      ) : null}
+      <p className="border-t border-line pt-3 text-sm">
+        {order.name} — <span dir="ltr">{order.phone}</span> — {[order.province, order.city, order.address].filter(Boolean).join("، ")}
+        {order.postal_code ? (
+          <>
+            {" "}
+            — کد پستی <span dir="ltr">{order.postal_code}</span>
+          </>
+        ) : null}
+      </p>
       {children}
     </div>
   );

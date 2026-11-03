@@ -1,6 +1,7 @@
-import type { NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { notifyOrder } from "@/lib/sms";
 import { toRial, verifyPayment } from "@/lib/zarinpal";
 
 // Zarinpal sends the customer back here with ?Authority=...&Status=OK|NOK. Nothing in the URL is trusted:
@@ -22,7 +23,8 @@ export async function GET(req: NextRequest) {
     } else {
       try {
         const refId = await verifyPayment(authority, toRial(order!.total));
-        db.prepare("UPDATE orders SET status = 'pending', ref_id = ? WHERE id = ? AND status = 'awaiting_payment'").run(refId, order!.id);
+        const paid = db.prepare("UPDATE orders SET status = 'pending', ref_id = ? WHERE id = ? AND status = 'awaiting_payment'").run(refId, order!.id);
+        if (paid.changes) after(() => notifyOrder(order!.id, "paid"));
       } catch (e) {
         error = e instanceof Error ? e.message : "خطا در تأیید پرداخت";
       }
