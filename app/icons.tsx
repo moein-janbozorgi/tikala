@@ -97,3 +97,60 @@ export const TrashIcon = () => (
     <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
   </Icon>
 );
+export const GridIcon = () => (
+  <Icon>
+    <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
+  </Icon>
+);
+export const TshirtIcon = () => (
+  <Icon>
+    <path d="M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3a4 4 0 0 1-8 0Z" />
+  </Icon>
+);
+export const ShirtIcon = () => (
+  <Icon>
+    <path d="M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3M8 3l4 4 4-4M12 7v14" />
+  </Icon>
+);
+export const PantsIcon = () => (
+  <Icon>
+    <path d="M6 3h12l1 18h-5l-2-11-2 11H5L6 3ZM6 7h12" />
+  </Icon>
+);
+export const HoodieIcon = () => (
+  <Icon>
+    <path d="M8 4C6 5 4 6.5 4 9v11h3v-9M16 4c2 1 4 2.5 4 5v11h-3v-9M7 11v10h10V11M8 4a4 4 0 0 0 8 0M9 17h6" />
+  </Icon>
+);
+export const ShoeIcon = () => (
+  <Icon>
+    <path d="M3 7v10h18v-1a3 3 0 0 0-3-3l-6-1.5L8 8 3 7ZM9 11l1.5-1.5M11.5 12.5 13 11" />
+  </Icon>
+);
+export const JacketIcon = () => (
+  <Icon>
+    <path d="M9 3 4 6v15h16V6l-5-3M9 3l3 3 3-3M12 6v15M7 14h2M15 14h2" />
+  </Icon>
+);
+export const SweaterIcon = () => (
+  <Icon>
+    <path d="M8 4 4 7v12h3v-9M16 4l4 3v12h-3v-9M7 10v10h10V10M8 4a4 2 0 0 0 8 0M7 17h10" />
+  </Icon>
+);
+export const GlassesIcon = () => (
+  <Icon>
+    <circle cx="6.5" cy="14" r="3.5" />
+    <circle cx="17.5" cy="14" r="3.5" />
+    <path d="M10 14h4M3 14l1-6M21 14l-1-6" />
+  </Icon>
+);
+/** Hand-drawn style shopping bag with a check, in the same sticker look as the old tik.png check mark. */
+export const BagCheckArt = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" fill="none" stroke="var(--brand-ink)" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <g transform="rotate(-8 50 55)">
+      <path d="M36 36v-7a14 14 0 0 1 28 0v7" />
+      <path d="M20 36h60l-5 50a6 6 0 0 1-6 5H31a6 6 0 0 1-6-5Z" fill="var(--brand)" />
+      <path d="m37 63 9 9 18-19" strokeWidth={7} />
+    </g>
+  </svg>
+);

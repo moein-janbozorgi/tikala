@@ -1,15 +1,29 @@
-import Image from "next/image";
 import Link from "next/link";
 import { db, type Product, type Variant } from "@/lib/db";
 import { addToCart } from "./actions";
 import { ErrorMessage } from "./error-message";
-import { BagIcon } from "./icons";
+import { FEATURES } from "./footer";
+import { BagCheckArt, BagIcon, GlassesIcon, GridIcon, HoodieIcon, JacketIcon, PantsIcon, ShirtIcon, ShoeIcon, SweaterIcon, TshirtIcon } from "./icons";
 import { LoadMore } from "./load-more";
 import { ProductImage } from "./product-image";
 import { QtyStepper } from "./qty-stepper";
 import { SearchInput } from "./search-input";
 
 const PAGE_SIZE = 12;
+
+// Icon and circle color per category; a category the admin adds later gets the bag icon and a color by position.
+const CATEGORY_LOOK: Record<string, [() => React.ReactNode, string]> = {
+  "": [GridIcon, "bg-neutral-800"],
+  "تی‌شرت": [TshirtIcon, "bg-rose-500"],
+  "پیراهن": [ShirtIcon, "bg-sky-500"],
+  "شلوار": [PantsIcon, "bg-indigo-600"],
+  "هودی": [HoodieIcon, "bg-orange-500"],
+  "کفش": [ShoeIcon, "bg-teal-600"],
+  "کاپشن و ژاکت": [JacketIcon, "bg-emerald-700"],
+  "بافت": [SweaterIcon, "bg-lime-600"],
+  "عینک": [GlassesIcon, "bg-red-600"],
+};
+const FALLBACK_COLORS = ["bg-violet-600", "bg-amber-500", "bg-cyan-600", "bg-fuchsia-600", "bg-blue-600"];
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
@@ -18,13 +32,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const q = typeof params.q === "string" ? params.q.trim().slice(0, 50).replace(/ي/g, "ی").replace(/ك/g, "ک") : "";
   // A type (subcategory, picked in the side menu) only means something inside its category, e.g. ?category=کفش&type=بوت.
   const type = category && typeof params.type === "string" ? params.type : undefined;
-  // Each category is pictured by its newest product that has an image.
   const categories = db
-    .prepare(
-      `SELECT category, (SELECT image FROM products p2 WHERE p2.active = 1 AND p2.category = p.category ORDER BY p2.image = '', p2.id DESC LIMIT 1) AS image
-       FROM products p WHERE active = 1 AND category != '' GROUP BY category ORDER BY category`,
-    )
-    .all() as { category: string; image: string }[];
+    .prepare("SELECT DISTINCT category FROM products WHERE active = 1 AND category != '' ORDER BY category")
+    .all() as { category: string }[];
 
   const where = ["active = 1"];
   const args: string[] = [];
@@ -68,12 +78,23 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {category || q ? null : (
         <section className="mb-10 flex items-center justify-between gap-6 rounded-3xl bg-brand px-6 py-12 text-brand-ink sm:px-12 sm:py-16">
           <div>
+            <p className="mb-4 inline-block rounded-full bg-brand-ink px-3 py-1 text-xs font-bold text-brand">بوتیک آنلاین تیکلا</p>
             <h1 className="max-w-lg font-display text-4xl leading-tight sm:text-6xl sm:leading-tight">استایل هر روزت را این‌جا پیدا کن</h1>
-            <p className="mt-4 max-w-md leading-7 text-brand-ink/75">بوتیک تیکلا عرضه کننده انواع لباس و شلوار مد روز</p>
+            <p className="mt-4 max-w-lg leading-8 text-brand-ink/80">
+              از تی‌شرت و پیراهن تا شلوار، هودی، بافت و کفش؛ لباس‌های مد روز را با سایز و رنگ دلخواهت انتخاب کن، آنلاین یا هنگام تحویل
+              پرداخت کن و سفارشت را درِ خانه تحویل بگیر.
+            </p>
+            <ul className="mt-6 flex flex-wrap gap-2 text-xs font-medium sm:text-sm">
+              {FEATURES.map((f) => (
+                <li key={f.label} className="flex items-center gap-1.5 rounded-full bg-white/60 px-3 py-1.5">
+                  {f.icon}
+                  {f.label}
+                </li>
+              ))}
+            </ul>
           </div>
-          {/* The PNG has a white background, so it sits in a white circle to look intentional in both themes. */}
-          <div className="grid size-24 shrink-0 place-items-center overflow-hidden rounded-full bg-white p-4 sm:size-44 sm:p-8">
-            <Image src="/products/tik.png" alt="" width={148} height={148} priority className="size-full" />
+          <div className="hidden size-44 shrink-0 place-items-center rounded-full bg-white p-7 shadow-lg shadow-brand-ink/10 sm:grid">
+            <BagCheckArt className="size-full" />
           </div>
         </section>
       )}
@@ -86,8 +107,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       </form>
 
       <nav aria-label="دسته‌بندی‌ها" className="mb-6 flex justify-between gap-4 overflow-x-auto p-1 pb-2 sm:gap-6">
-        {[{ category: "", image: "" }, ...categories].map((c) => {
+        {[{ category: "" }, ...categories].map((c, i) => {
           const active = (category ?? "") === c.category;
+          const [CategoryIcon, color] = CATEGORY_LOOK[c.category] ?? [BagIcon, FALLBACK_COLORS[i % FALLBACK_COLORS.length]];
           return (
             <Link
               key={c.category}
@@ -98,13 +120,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               <span
                 className={`block rounded-full ring-offset-2 ring-offset-surface transition group-hover:scale-105 ${active ? "ring-2 ring-accent" : ""}`}
               >
-                {c.category ? (
-                  <ProductImage src={c.image} alt="" className="size-14 rounded-full text-[10px] sm:size-18" />
-                ) : (
-                  <span className="grid size-14 place-items-center rounded-full bg-white p-3 sm:size-18">
-                    <Image src="/products/tik.png" alt="" width={48} height={48} className="size-full" />
-                  </span>
-                )}
+                <span className={`grid size-14 place-items-center rounded-full text-white sm:size-16 [&_svg]:size-7 ${color}`}>
+                  <CategoryIcon />
+                </span>
               </span>
               <span className={`line-clamp-2 text-center text-xs leading-5 ${active ? "font-bold text-accent" : "font-medium"}`}>
                 {c.category || "همه"}

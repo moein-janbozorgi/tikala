@@ -9,7 +9,7 @@ const SOCIAL = [
   { label: "تلگرام", href: "", icon: <TelegramIcon /> },
 ].filter((s) => s.href);
 
-const FEATURES = [
+export const FEATURES = [
   { label: `ارسال رایگان بالای ${toman(FREE_SHIPPING_FROM)}`, icon: <TruckIcon /> },
   { label: "امکان پرداخت هنگام تحویل", icon: <CashIcon /> },
   { label: "پرداخت آنلاین امن", icon: <CardIcon /> },
