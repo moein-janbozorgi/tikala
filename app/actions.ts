@@ -111,8 +111,15 @@ export async function register(form: FormData) {
   const reject = (message: string) => failWithValues(back, message, "register", { name: str(form, "name"), email: str(form, "email") });
   const problem = nameProblem(name) ?? emailProblem(email) ?? passwordProblem(password, String(form.get("confirm") ?? ""));
   if (problem) await reject(problem);
+  // "Already registered" tells whether an email has an account, so trying taken emails counts like a failed login:
+  // one IP can't check more than a handful of emails.
+  const ip = await clientIp();
+  if (loginLocked(email, ip)) await reject(LOCKED);
   const taken = "این ایمیل قبلاً ثبت شده است";
-  if (db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) await reject(taken);
+  if (db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) {
+    recordLoginFailure(email, ip);
+    await reject(taken);
+  }
 
   let userId = 0;
   try {

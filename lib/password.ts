@@ -23,7 +23,7 @@ export async function verifyPassword(password: string, stored: string) {
   return timingSafeEqual(await scryptAsync(password, salt, 64), Buffer.from(hash, "hex"));
 }
 
-// shortcut: failed logins are kept in this server's memory, so a restart clears them and several servers wouldn't share
+// shortcut: failed logins (and register attempts on taken emails) are kept in this server's memory, so a restart clears them and several servers wouldn't share
 // them; move them to the database if the shop ever runs on more than one server.
 // Counted per email+IP (so a stranger can't lock someone else out of their account) and per IP (so one visitor can't try
 // many emails or passwords). Keys: "<email>\n<ip>" and "ip:<ip>".
