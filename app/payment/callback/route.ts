@@ -1,6 +1,7 @@
 import { after, type NextRequest } from "next/server";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { errorParam } from "@/lib/validation";
 import { notifyOrder } from "@/lib/sms";
 import { toRial, verifyPayment } from "@/lib/zarinpal";
 
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
   const order = db.prepare("SELECT id, total, status FROM orders WHERE authority = ?").get(authority) as
     | { id: number; total: number; status: string }
     | undefined;
-  if (!authority || !order) redirect(`/account?error=${encodeURIComponent("تراکنش پیدا نشد")}`);
+  if (!authority || !order) redirect(`/account?error=${errorParam("تراکنش پیدا نشد")}`);
 
   let error = "";
   // Only orders still awaiting payment are verified; an unverified payment is refunded by Zarinpal automatically.
@@ -30,5 +31,5 @@ export async function GET(req: NextRequest) {
       }
     }
   }
-  redirect(`/account?order=${order!.id}&${error ? `error=${encodeURIComponent(error)}` : "paid=1"}`);
+  redirect(`/account?order=${order!.id}&${error ? `error=${errorParam(error)}` : "paid=1"}`);
 }

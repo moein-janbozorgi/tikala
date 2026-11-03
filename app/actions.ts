@@ -12,11 +12,11 @@ import { PROVINCES } from "@/lib/format";
 import { clearLoginFailures, hashPassword, loginLocked, passwordProblem, recordLoginFailure, verifyPassword } from "@/lib/password";
 import { checkCode, consumeCode, createCode, smsAllowedForIp } from "@/lib/otp";
 import { notifyOrder, sendLoginCode } from "@/lib/sms";
-import { emailProblem, nameProblem, normalizePhone, normalizePostalCode, safeNext, toLatinDigits } from "@/lib/validation";
+import { emailProblem, errorParam, nameProblem, normalizePhone, normalizePostalCode, safeNext, toLatinDigits } from "@/lib/validation";
 
 const str = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
 const fail = (path: string, message: string): never =>
-  redirect(`${path}${path.includes("?") ? "&" : "?"}error=${encodeURIComponent(message)}`);
+  redirect(`${path}${path.includes("?") ? "&" : "?"}error=${errorParam(message)}`);
 
 export async function addToCart(form: FormData) {
   const variantId = Number(form.get("variantId"));
@@ -186,7 +186,7 @@ export async function verifyCode(form: FormData) {
       taken = true; // UNIQUE: someone else verified this number in the meantime
     }
     consumeCode(phone!);
-    redirect(taken ? `/account?error=${encodeURIComponent("این شماره برای حساب دیگری ثبت شده است")}` : "/account?phone=1");
+    redirect(taken ? `/account?error=${errorParam("این شماره برای حساب دیگری ثبت شده است")}` : "/account?phone=1");
   }
 
   let user = db.prepare("SELECT id FROM users WHERE phone = ?").get(phone) as { id: number } | undefined;

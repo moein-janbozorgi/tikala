@@ -140,6 +140,15 @@ test("SMS codes: right code passes, wrong ones count, 3 tries, 3-minute expiry, 
   assert.ok(smsAllowedForIp("1.2.3.4", t + 60 * 60_000), "allowed again after the hour");
 });
 
+test("?error= banners show only messages the server signed", async () => {
+  const { errorParam, readErrorParam } = await import("../lib/validation.ts");
+  const value = decodeURIComponent(errorParam("کد وارد شده اشتباه است"));
+  assert.equal(readErrorParam(value), "کد وارد شده اشتباه است");
+  assert.equal(readErrorParam(value.replace("اشتباه", "مسدود")), null, "edited message rejected");
+  assert.equal(readErrorParam("حساب شما مسدود شد؛ با ۰۹۱۲ تماس بگیرید"), null, "unsigned text rejected");
+  assert.equal(readErrorParam(["a", "b"]), null);
+});
+
 test("?next= only allows same-site paths", async () => {
   const { safeNext } = await import("../lib/validation.ts");
   for (const bad of ["/\\evil.com", "//evil.com", "/\t/evil.com", "https://evil.com", "javascript:alert(1)", 42, undefined]) {

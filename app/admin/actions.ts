@@ -7,10 +7,11 @@ import { cancelOrder, db, saveVariants, transaction } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { ORDER_STATUSES } from "@/lib/format";
 import { saveUpload } from "@/lib/uploads";
+import { errorParam } from "@/lib/validation";
 
 const text = (form: FormData, key: string) => String(form.get(key) ?? "").trim().replace(/\s+/g, " ");
 const fail = (path: string, message: string): never =>
-  redirect(`${path}${path.includes("?") ? "&" : "?"}error=${encodeURIComponent(message)}`);
+  redirect(`${path}${path.includes("?") ? "&" : "?"}error=${errorParam(message)}`);
 
 export async function saveProduct(form: FormData) {
   await requireAdmin();
