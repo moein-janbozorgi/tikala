@@ -38,6 +38,12 @@ export async function endSession() {
   store.delete(COOKIE);
 }
 
+/** Signs out every other device of this user, e.g. after a password change, so a stolen session stops working. */
+export async function endOtherSessions(userId: number) {
+  const token = (await cookies()).get(COOKIE)?.value ?? "";
+  db.prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?").run(userId, sha(token));
+}
+
 export async function getUser() {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return undefined;

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { db, placeOrder, type CheckoutInfo } from "@/lib/db";
 import { startPayment } from "@/lib/zarinpal";
-import { endSession, requireUser, startSession } from "@/lib/auth";
+import { endOtherSessions, endSession, requireUser, startSession } from "@/lib/auth";
 import { getCart, setCart } from "@/lib/cart";
 import { clearFlash, setFlash } from "@/lib/flash";
 import { PROVINCES } from "@/lib/format";
@@ -209,6 +209,7 @@ export async function setPassword(form: FormData) {
   const problem = passwordProblem(String(form.get("password") ?? ""), String(form.get("confirm") ?? ""));
   if (problem) fail("/account", problem);
   db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(await hashPassword(String(form.get("password"))), user.id);
+  await endOtherSessions(user.id);
   clearLoginFailures(user.email!);
   redirect("/account?password=1");
 }
