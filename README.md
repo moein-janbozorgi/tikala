@@ -1,4 +1,4 @@
-# Tikala clothing shop (بوتیک تیکلا)
+# Tikla clothing shop (بوتیک تیکلا)
 
 A Persian (RTL) clothing store built with Next.js and Node's built-in SQLite. It has no external database or services.
 
