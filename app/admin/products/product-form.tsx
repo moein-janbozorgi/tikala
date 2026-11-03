@@ -1,14 +1,17 @@
-import Link from "next/link";
 import { db, type Product, type Variant } from "@/lib/db";
 import { saveProduct } from "../actions";
 import { ProductImage } from "../../product-image";
+import { CategoryFields } from "./category-fields";
 
 /** Create form when `product` is missing, edit form otherwise. */
 export function ProductForm({ product, variants = [] }: { product?: Product; variants?: Variant[] }) {
   const categories = (db.prepare("SELECT name FROM categories ORDER BY name").all() as { name: string }[]).map((c) => c.name);
-  const types = (db.prepare("SELECT DISTINCT subcategory FROM products WHERE subcategory != '' ORDER BY subcategory").all() as { subcategory: string }[]).map(
-    (t) => t.subcategory,
-  );
+  const types: Record<string, string[]> = {};
+  for (const t of db.prepare("SELECT DISTINCT category, subcategory FROM products WHERE subcategory != '' ORDER BY subcategory").all() as {
+    category: string;
+    subcategory: string;
+  }[])
+    (types[t.category] ??= []).push(t.subcategory);
   return (
     <form action={saveProduct} className="card space-y-3">
       <input type="hidden" name="id" value={product?.id ?? ""} />
@@ -17,30 +20,7 @@ export function ProductForm({ product, variants = [] }: { product?: Product; var
         <input name="name" defaultValue={product?.name} required className="input" />
       </label>
       <div className="grid gap-3 md:grid-cols-3">
-        <label className="block">
-          <span className="mb-1 flex justify-between text-sm">
-            دسته‌بندی
-            <Link href="/admin/categories" className="text-xs text-accent hover:underline">
-              + دسته جدید
-            </Link>
-          </span>
-          <select name="category" defaultValue={product?.category ?? ""} className="input">
-            <option value="">بدون دسته‌بندی</option>
-            {categories.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-sm">نوع (زیردسته)</span>
-          {/* Suggests the types already in use; typing a new one creates it. */}
-          <input name="subcategory" defaultValue={product?.subcategory} list="product-types" placeholder="مثلاً: کتانی" className="input" />
-          <datalist id="product-types">
-            {types.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-        </label>
+        <CategoryFields categories={categories} types={types} category={product?.category ?? ""} subcategory={product?.subcategory ?? ""} />
         <label className="block">
           <span className="mb-1 block text-sm">قیمت (تومان)</span>
           <input name="price" type="number" min={1} defaultValue={product?.price} required dir="ltr" className="input" />
