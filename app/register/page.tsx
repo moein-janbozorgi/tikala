@@ -5,6 +5,7 @@ import { getFlash } from "@/lib/flash";
 import { register } from "../actions";
 import { AlreadySignedIn } from "../already-signed-in";
 import { ErrorMessage } from "../error-message";
+import { FieldError, ValidatedForm } from "../validated-form";
 
 export default async function RegisterPage({ searchParams }: PageProps<"/register">) {
   const user = await getUser();
@@ -14,7 +15,7 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
   const target = safeNext(next);
 
   return (
-    <form action={register} className="card mx-auto mt-6 max-w-sm space-y-4 p-8">
+    <ValidatedForm action={register} className="card mx-auto mt-6 max-w-sm space-y-4 p-8">
       <div>
         <h1 className="text-2xl font-extrabold">ثبت‌نام</h1>
         <p className="mt-1 text-sm text-muted">برای ثبت سفارش یک حساب بسازید.</p>
@@ -29,11 +30,12 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
           autoComplete="name"
           required
           maxLength={50}
-          // Same rules as nameProblem() / emailProblem() on the server; the browser shows `title` when they fail.
+          // Same rules as nameProblem() / emailProblem() on the server; `title` is the message shown when they fail.
           pattern="\s*[\p{L}\p{M}‌ ]{2,50}\s*"
           title="۲ تا ۵۰ کاراکتر، فقط حروف و فاصله"
           className="input"
         />
+        <FieldError name="name" label="نام و نام خانوادگی" />
       </label>
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium">ایمیل</span>
@@ -50,6 +52,7 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
           placeholder="name@example.com"
           className="input"
         />
+        <FieldError name="email" label="ایمیل" />
       </label>
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium">رمز عبور</span>
@@ -61,7 +64,7 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
           required
           minLength={8}
           maxLength={64}
-          // Same rule as passwordProblem() on the server; the browser shows `title` when it fails.
+          // Same rule as passwordProblem() on the server; `title` is the message shown when it fails.
           pattern="(?=.*\p{L})(?=.*\p{Nd}).{8,64}"
           title="۸ تا ۶۴ کاراکتر، شامل حداقل یک حرف و یک عدد"
           aria-describedby="password-hint"
@@ -70,10 +73,12 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
         <span id="password-hint" className="mt-1.5 block text-xs text-muted">
           ۸ تا ۶۴ کاراکتر، شامل حداقل یک حرف و یک عدد
         </span>
+        <FieldError name="password" label="رمز عبور" />
       </label>
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium">تکرار رمز عبور</span>
         <input name="confirm" type="password" autoComplete="new-password" dir="ltr" required className="input" />
+        <FieldError name="confirm" label="تکرار رمز عبور" />
       </label>
       <button className="btn w-full">ثبت‌نام</button>
       <p className="text-center text-sm text-muted">
@@ -82,6 +87,6 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
           ورود
         </Link>
       </p>
-    </form>
+    </ValidatedForm>
   );
 }

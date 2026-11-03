@@ -5,6 +5,7 @@ import { normalizePhone, safeNext } from "@/lib/validation";
 import { requestCode, verifyCode } from "../../actions";
 import { AlreadySignedIn } from "../../already-signed-in";
 import { ErrorMessage } from "../../error-message";
+import { FieldError, ValidatedForm } from "../../validated-form";
 import { ResendButton } from "./resend-button";
 
 export default async function VerifyPage({ searchParams }: PageProps<"/login/verify">) {
@@ -34,7 +35,7 @@ export default async function VerifyPage({ searchParams }: PageProps<"/login/ver
         </p>
       </div>
       <ErrorMessage error={error} />
-      <form action={verifyCode} className="space-y-4">
+      <ValidatedForm action={verifyCode} className="space-y-4">
         {hidden}
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium">کد تأیید</span>
@@ -45,9 +46,10 @@ export default async function VerifyPage({ searchParams }: PageProps<"/login/ver
             dir="ltr"
             required
             pattern="[0-9۰-۹]{6}"
-            title="کد ۶ رقمی"
+            title="کد تأیید باید ۶ رقم باشد."
             className="input text-center text-xl tracking-[0.5em]"
           />
+          <FieldError name="code" label="کد تأیید" />
         </label>
         {/* Shown to everyone (not only new numbers), so the page reveals nothing about which numbers have accounts. */}
         {purpose === "login" ? (
@@ -60,7 +62,7 @@ export default async function VerifyPage({ searchParams }: PageProps<"/login/ver
           </label>
         ) : null}
         <button className="btn w-full">تأیید و ورود</button>
-      </form>
+      </ValidatedForm>
       <div className="flex justify-between border-t border-line pt-5 text-sm">
         <form action={requestCode}>
           {hidden}

@@ -11,8 +11,11 @@ function problem(el: Field): true | string | undefined {
   const v = el.validity;
   if (v.valid) return undefined;
   if (v.valueMissing) return true;
+  // A field's `title` states its rule, so it beats the generic messages below.
+  if (el.title) return el.title;
   if (v.tooShort && "minLength" in el) return `حداقل ${el.minLength.toLocaleString("fa-IR")} حرف وارد کنید.`;
-  return el.title || "مقدار واردشده درست نیست.";
+  if (v.typeMismatch && el.type === "email") return "ایمیل معتبر وارد کنید، مثال: name@example.com";
+  return "مقدار واردشده درست نیست.";
 }
 
 function check(el: Field) {
