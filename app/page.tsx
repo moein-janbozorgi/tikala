@@ -18,9 +18,13 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const q = typeof params.q === "string" ? params.q.trim().slice(0, 50).replace(/ي/g, "ی").replace(/ك/g, "ک") : "";
   // A type (subcategory, picked in the side menu) only means something inside its category, e.g. ?category=کفش&type=بوت.
   const type = category && typeof params.type === "string" ? params.type : undefined;
+  // Each category is pictured by its newest product that has an image.
   const categories = db
-    .prepare("SELECT DISTINCT category FROM products WHERE active = 1 AND category != '' ORDER BY category")
-    .all() as { category: string }[];
+    .prepare(
+      `SELECT category, (SELECT image FROM products p2 WHERE p2.active = 1 AND p2.category = p.category ORDER BY p2.image = '', p2.id DESC LIMIT 1) AS image
+       FROM products p WHERE active = 1 AND category != '' GROUP BY category ORDER BY category`,
+    )
+    .all() as { category: string; image: string }[];
 
   const where = ["active = 1"];
   const args: string[] = [];
@@ -81,20 +85,34 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         <button className="btn shrink-0">جستجو</button>
       </form>
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <Link href={link({ category: undefined, type: undefined })} className={`chip ${!category ? "chip-active" : ""}`}>
-          همه
-        </Link>
-        {categories.map((c) => (
-          <Link
-            key={c.category}
-            href={link({ category: c.category, type: undefined })}
-            className={`chip ${category === c.category ? "chip-active" : ""}`}
-          >
-            {c.category}
-          </Link>
-        ))}
-      </div>
+      <nav aria-label="دسته‌بندی‌ها" className="mb-6 flex gap-4 overflow-x-auto p-1 pb-2 sm:gap-6">
+        {[{ category: "", image: "" }, ...categories].map((c) => {
+          const active = (category ?? "") === c.category;
+          return (
+            <Link
+              key={c.category}
+              href={link({ category: c.category || undefined, type: undefined })}
+              aria-current={active ? "page" : undefined}
+              className="group flex w-16 shrink-0 flex-col items-center gap-2 sm:w-20"
+            >
+              <span
+                className={`block rounded-full p-0.5 ring-2 transition ${active ? "ring-accent" : "ring-line group-hover:ring-muted"}`}
+              >
+                {c.category ? (
+                  <ProductImage src={c.image} alt="" className="size-14 rounded-full text-[10px] sm:size-18" />
+                ) : (
+                  <span className="grid size-14 place-items-center rounded-full bg-white p-3 sm:size-18">
+                    <Image src="/products/tik.png" alt="" width={48} height={48} className="size-full" />
+                  </span>
+                )}
+              </span>
+              <span className={`line-clamp-1 text-center text-xs sm:text-sm ${active ? "font-bold" : "text-muted group-hover:text-ink"}`}>
+                {c.category || "همه"}
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
 
       {q ? (
         <p className="mb-4 text-sm text-muted">
