@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { shippingCost } from "./format.ts";
 import { SAMPLE_PRODUCTS } from "./samples.ts";
 
 const path = process.env.DB_PATH ?? "data/shop.db";
@@ -230,6 +231,7 @@ export function placeOrder(userId: number, cart: Record<string, number>, info: C
       items.push({ ...v, qty });
     }
     if (items.length === 0) throw new Error("سبد خرید خالی است");
+    total += shippingCost(total);
 
     const order = db
       .prepare(

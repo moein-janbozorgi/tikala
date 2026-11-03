@@ -1,5 +1,9 @@
 export const toman = (n: number) => `${n.toLocaleString("fa-IR")} تومان`;
 
+/** Shipping in toman: free from 5,000,000 toman of goods, otherwise 85,000. */
+export const FREE_SHIPPING_FROM = 5_000_000;
+export const shippingCost = (subtotal: number) => (subtotal >= FREE_SHIPPING_FROM ? 0 : 85_000);
+
 export const PROVINCES = [
   "آذربایجان شرقی", "آذربایجان غربی", "اردبیل", "اصفهان", "البرز", "ایلام", "بوشهر", "تهران", "چهارمحال و بختیاری",
   "خراسان جنوبی", "خراسان رضوی", "خراسان شمالی", "خوزستان", "زنجان", "سمنان", "سیستان و بلوچستان", "فارس", "قزوین",

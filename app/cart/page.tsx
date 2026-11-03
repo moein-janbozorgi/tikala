@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getUser } from "@/lib/auth";
 import { getCartLines } from "@/lib/cart";
 import { getFlash } from "@/lib/flash";
-import { toman } from "@/lib/format";
+import { FREE_SHIPPING_FROM, shippingCost, toman } from "@/lib/format";
 import { checkout, updateCartItem } from "../actions";
 import { AddressFields } from "./address-fields";
 import { ErrorMessage } from "../error-message";
@@ -14,6 +14,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
   const lines = await getCartLines();
   const user = await getUser();
   const total = lines.reduce((sum, l) => sum + l.price * l.qty, 0);
+  const shipping = shippingCost(total);
   // What the customer typed last time, if the server sent the form back with an error.
   const typed = await getFlash("checkout");
 
@@ -101,12 +102,15 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
           </p>
           <p className="flex justify-between">
             <span className="text-muted">هزینه ارسال</span>
-            <span className="font-medium text-success">رایگان</span>
+            {shipping ? <span>{toman(shipping)}</span> : <span className="font-medium text-success">رایگان</span>}
           </p>
+          {shipping ? (
+            <p className="text-xs text-muted">با {toman(FREE_SHIPPING_FROM - total)} خرید بیشتر، ارسال رایگان می‌شود.</p>
+          ) : null}
         </div>
         <p className="flex justify-between border-t border-line pt-4 text-lg font-bold">
           <span>مبلغ قابل پرداخت</span>
-          <span>{toman(total)}</span>
+          <span>{toman(total + shipping)}</span>
         </p>
         {user ? (
           <form action={checkout} className="space-y-4 border-t border-line pt-5">

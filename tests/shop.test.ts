@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 process.env.DB_PATH = ":memory:";
 const { db, cancelOrder, expireUnpaidOrders, parseVariants, placeOrder, purgeOrder } = await import("../lib/db.ts");
+const { shippingCost } = await import("../lib/format.ts");
 const { clearLoginFailures, hashPassword, loginLocked, passwordProblem, recordLoginFailure, verifyPassword } = await import("../lib/password.ts");
 
 const user = db.prepare("INSERT INTO users (name, email, password_hash) VALUES ('t', 't@t.t', 'x') RETURNING id").get() as { id: number };
@@ -24,7 +25,7 @@ test("placeOrder charges the right total and decrements stock", () => {
     price: number;
   };
   const orderId = placeOrder(user.id, { [v.id]: 2 }, info);
-  assert.equal((db.prepare("SELECT total FROM orders WHERE id = ?").get(orderId) as { total: number }).total, v.price * 2);
+  assert.equal((db.prepare("SELECT total FROM orders WHERE id = ?").get(orderId) as { total: number }).total, v.price * 2 + shippingCost(v.price * 2));
   assert.equal(stockOf(v.id), v.stock - 2);
 });
 
@@ -42,7 +43,7 @@ test("placeOrder skips cart items whose product was deleted or hidden, instead o
   const goneVariant = db.prepare("INSERT INTO variants (product_id, size, color, stock) VALUES (?, 'M', 'x', 5) RETURNING id").get(gone.id) as { id: number };
   db.prepare("DELETE FROM products WHERE id = ?").run(gone.id); // what the admin's delete button does; variants cascade
   const orderId = placeOrder(user.id, { [v.id]: 1, [goneVariant.id]: 2 }, info);
-  assert.equal((db.prepare("SELECT total FROM orders WHERE id = ?").get(orderId) as { total: number }).total, v.price);
+  assert.equal((db.prepare("SELECT total FROM orders WHERE id = ?").get(orderId) as { total: number }).total, v.price + shippingCost(v.price));
   assert.throws(() => placeOrder(user.id, { [goneVariant.id]: 1 }, info), /خالی/, "a cart of only deleted items is empty");
 });
 
@@ -212,4 +213,10 @@ test("every province has its city list", async () => {
   assert.deepEqual(Object.keys(CITIES).sort(), [...PROVINCES].sort());
   for (const p of PROVINCES) assert.ok(CITIES[p].length > 0, p);
   assert.ok(CITIES["تهران"].includes("تهران") && CITIES["اصفهان"].includes("کاشان"));
+});
+
+test("shipping is 85,000 toman below 5,000,000 and free from it", () => {
+  assert.equal(shippingCost(4_999_999), 85_000);
+  assert.equal(shippingCost(5_000_000), 0);
+  assert.equal(shippingCost(7_000_000), 0);
 });
