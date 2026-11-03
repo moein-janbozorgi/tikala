@@ -44,7 +44,7 @@ async function submitForm(path, marker, fields) {
 }
 // SMS: the server is started with SMS_CONSOLE=1, so codes and messages land in sms-outbox.log next to the database.
 const outbox = () => { try { return readFileSync(join(dirname(process.env.DB_PATH), "sms-outbox.log"), "utf8"); } catch { return ""; } };
-const latestCode = (phone) => [...outbox().matchAll(new RegExp(`\\t${phone}\\tکد ورود تیکالا: ([0-9]{5})`, "g"))].at(-1)?.[1];
+const latestCode = (phone) => [...outbox().matchAll(new RegExp(`\\t${phone}\\tکد ورود تیکالا: ([0-9]{6})`, "g"))].at(-1)?.[1];
 const check = (cond, msg) => { console.log((cond ? "PASS " : "FAIL ") + msg); if (!cond) process.exitCode = 1; };
 
 for (const p of ["/", "/product/1", "/cart", "/login", "/register"]) check((await get(p)).status === 200, `GET ${p} 200`);
@@ -281,7 +281,7 @@ await submitForm("/", "خروج", {});
 const p2 = "09350000002";
 r = await submitForm("/login", 'value="login"', { purpose: "login", next: "/", phone: p2 });
 const verifyUrl = r.location;
-r = await submitForm(verifyUrl, 'name="code"', { phone: p2, next: "/", purpose: "login", code: latestCode(p2) === "00000" ? "11111" : "00000" });
+r = await submitForm(verifyUrl, 'name="code"', { phone: p2, next: "/", purpose: "login", code: latestCode(p2) === "000000" ? "111111" : "000000" });
 check(decodeURIComponent(r.location ?? "").includes("اشتباه"), "wrong SMS code rejected");
 r = await submitForm(verifyUrl, 'name="code"', { phone: p2, next: "/", purpose: "login", code: latestCode(p2), name: "" });
 check(decodeURIComponent(r.location ?? "").includes("نام را وارد کنید"), "new number needs a name");

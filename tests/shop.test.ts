@@ -109,13 +109,13 @@ test("phones and postal codes accept Persian digits and common prefixes", async 
   assert.equal(normalizePostalCode("123456789"), null);
 });
 
-test("SMS codes: right code passes, wrong ones count, 5 tries, 3-minute expiry, resend and hourly limits", async () => {
+test("SMS codes: right code passes, wrong ones count, 3 tries, 3-minute expiry, resend and hourly limits", async () => {
   const { checkCode, consumeCode, createCode } = await import("../lib/otp.ts");
   const phone = "09120000001";
   let t = 2_000_000_000_000;
   const code = createCode(phone, t);
-  assert.match(code, /^\d{5}$/);
-  assert.equal(checkCode(phone, code === "11111" ? "22222" : "11111", t), "کد وارد شده اشتباه است");
+  assert.match(code, /^\d{6}$/);
+  assert.equal(checkCode(phone, code === "111111" ? "222222" : "111111", t), "کد وارد شده اشتباه است");
   assert.equal(checkCode(phone, code, t), null, "right code passes");
   assert.equal(checkCode(phone, code, t), null, "still valid until consumed (so a missing name can be fixed)");
   consumeCode(phone);
@@ -126,8 +126,9 @@ test("SMS codes: right code passes, wrong ones count, 5 tries, 3-minute expiry, 
   assert.notEqual(checkCode("09120000003", late, t + 3 * 60_000 + 1), null, "expired after 3 minutes");
 
   const brute = createCode("09120000004", t);
-  for (let i = 0; i < 5; i++) checkCode("09120000004", "00000", t);
-  assert.notEqual(checkCode("09120000004", brute, t), null, "locked after 5 wrong tries");
+  const wrong = brute === "000000" ? "111111" : "000000";
+  for (let i = 0; i < 3; i++) checkCode("09120000004", wrong, t);
+  assert.notEqual(checkCode("09120000004", brute, t), null, "locked after 3 wrong tries");
 
   for (let i = 0; i < 5; i++) createCode("09120000005", (t += 61_000));
   assert.throws(() => createCode("09120000005", (t += 61_000)), /یک ساعت/, "6th code in an hour refused");

@@ -41,7 +41,7 @@ At checkout, customers choose online payment or cash on delivery. Online orders 
 
 ## SMS (Kavenegar)
 
-Customers sign in with a mobile number and a 5-digit SMS code (email and password still work). They also get an SMS when an order is placed (cash on delivery), paid online, or marked shipped.
+Customers sign in with a mobile number and a 6-digit SMS code (email and password still work). They also get an SMS when an order is placed (cash on delivery), paid online, or marked shipped.
 
 | Variable | Meaning |
 |---|---|
@@ -51,7 +51,7 @@ Customers sign in with a mobile number and a 5-digit SMS code (email and passwor
 
 - Without an API key in development, messages are printed in the server console and saved to `data/sms-outbox.log`, so you can test logins.
 - In production without a key, phone login shows «سرویس پیامک تنظیم نشده است» and no order messages are sent. `SMS_CONSOLE=1` forces console mode (used by the e2e test).
-- Code rules: valid 3 minutes, 5 tries, one resend per minute, at most 5 codes per number per hour.
+- Code rules: valid 3 minutes, 3 tries, one resend per minute, at most 5 codes per number per hour.
 - **Forgot password:** add a mobile number in the account page, then sign in with a code and set a new password there.
 
 ## Product photos

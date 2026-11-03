@@ -22,7 +22,7 @@ export default async function VerifyPage({ searchParams }: PageProps<"/login/ver
       <div>
         <h1 className="text-2xl font-extrabold">کد تأیید</h1>
         <p className="mt-1 text-sm text-muted">
-          کد ۵ رقمی ارسال‌شده به <span dir="ltr">{phone}</span> را وارد کنید.
+          کد ۶ رقمی ارسال‌شده به <span dir="ltr">{phone}</span> را وارد کنید.
         </p>
       </div>
       <ErrorMessage error={error} />
@@ -36,8 +36,8 @@ export default async function VerifyPage({ searchParams }: PageProps<"/login/ver
             autoComplete="one-time-code"
             dir="ltr"
             required
-            pattern="[0-9۰-۹]{5}"
-            title="کد ۵ رقمی"
+            pattern="[0-9۰-۹]{6}"
+            title="کد ۶ رقمی"
             className="input text-center text-xl tracking-[0.5em]"
           />
         </label>

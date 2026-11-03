@@ -1,12 +1,12 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { db } from "./db.ts";
 
-// One-time SMS login codes: 5 digits, valid 3 minutes, 5 tries each, one resend per minute, 5 sends per phone per hour.
+// One-time SMS login codes: 6 digits, valid 3 minutes, 3 tries each, one resend per minute, 5 sends per phone per hour.
 const VALID_FOR = 3 * 60 * 1000;
 const RESEND_AFTER = 60 * 1000;
 const HOUR = 60 * 60 * 1000;
 const MAX_SENDS_PER_HOUR = 5;
-const MAX_TRIES = 5;
+const MAX_TRIES = 3;
 const hash = (phone: string, code: string) => createHash("sha256").update(`${phone}:${code}`).digest();
 
 type Row = { code_hash: string; sent_at: number; expires_at: number; attempts: number; window_start: number; sends: number };
@@ -21,7 +21,7 @@ export function createCode(phone: string, now = Date.now()) {
   const sameHour = prev && now - prev.window_start < HOUR;
   if (sameHour && prev.sends >= MAX_SENDS_PER_HOUR) throw new Error("تعداد درخواست کد بیش از حد مجاز است؛ یک ساعت دیگر تلاش کنید");
 
-  const code = String(randomInt(10000, 100000));
+  const code = String(randomInt(100000, 1000000));
   db.prepare(
     `INSERT INTO otp_codes (phone, code_hash, sent_at, expires_at, attempts, window_start, sends) VALUES (?, ?, ?, ?, 0, ?, ?)
      ON CONFLICT (phone) DO UPDATE SET code_hash = excluded.code_hash, sent_at = excluded.sent_at, expires_at = excluded.expires_at,
