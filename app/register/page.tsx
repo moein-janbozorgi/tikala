@@ -77,7 +77,16 @@ export default async function RegisterPage({ searchParams }: PageProps<"/registe
       </label>
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium">تکرار رمز عبور</span>
-        <input name="confirm" type="password" autoComplete="new-password" dir="ltr" required className="input" />
+        <input
+          name="confirm"
+          type="password"
+          autoComplete="new-password"
+          dir="ltr"
+          required
+          data-match="password"
+          data-match-message="رمز عبور و تکرار آن یکسان نیستند."
+          className="input"
+        />
         <FieldError name="confirm" label="تکرار رمز عبور" />
       </label>
       <button className="btn w-full">ثبت‌نام</button>

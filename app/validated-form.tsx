@@ -9,8 +9,11 @@ const Ctx = createContext<{ errors: Errors; recheck: (name: string) => void }>({
 
 function problem(el: Field): true | string | undefined {
   const v = el.validity;
-  if (v.valid) return undefined;
   if (v.valueMissing) return true;
+  // data-match="password": this field must repeat that one (a password confirmation).
+  const other = el.dataset.match && el.form?.elements.namedItem(el.dataset.match);
+  if (other && "value" in other && other.value !== el.value) return el.dataset.matchMessage ?? "مقدار تکرار یکسان نیست.";
+  if (v.valid) return undefined;
   // A field's `title` states its rule, so it beats the generic messages below.
   if (el.title) return el.title;
   if (v.tooShort && "minLength" in el) return `حداقل ${el.minLength.toLocaleString("fa-IR")} حرف وارد کنید.`;
@@ -62,7 +65,12 @@ export function ValidatedForm({ children, ...props }: React.ComponentProps<"form
           e.currentTarget.querySelector<HTMLElement>("[aria-invalid=true]")?.focus();
         }
       }}
-      onInput={(e) => recheck((e.target as Field).name)}
+      onInput={(e) => {
+        const { name } = e.target as Field;
+        recheck(name);
+        // Editing a password also re-judges its confirmation.
+        e.currentTarget.querySelectorAll<Field>(`[data-match="${name}"]`).forEach((el) => recheck(el.name));
+      }}
     >
       <Ctx value={{ errors, recheck }}>{children}</Ctx>
     </form>
