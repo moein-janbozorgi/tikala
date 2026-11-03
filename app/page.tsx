@@ -85,7 +85,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         <button className="btn shrink-0">جستجو</button>
       </form>
 
-      <nav aria-label="دسته‌بندی‌ها" className="mb-6 flex gap-4 overflow-x-auto p-1 pb-2 sm:gap-6">
+      <nav aria-label="دسته‌بندی‌ها" className="mb-6 flex justify-between gap-4 overflow-x-auto p-1 pb-2 sm:gap-6">
         {[{ category: "", image: "" }, ...categories].map((c) => {
           const active = (category ?? "") === c.category;
           return (
@@ -93,10 +93,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               key={c.category}
               href={link({ category: c.category || undefined, type: undefined })}
               aria-current={active ? "page" : undefined}
-              className="group flex w-16 shrink-0 flex-col items-center gap-2 sm:w-20"
+              className="group flex w-20 shrink-0 flex-col items-center gap-2 sm:w-24"
             >
               <span
-                className={`block rounded-full p-0.5 ring-2 transition ${active ? "ring-accent" : "ring-line group-hover:ring-muted"}`}
+                className={`block rounded-full ring-offset-2 ring-offset-surface transition group-hover:scale-105 ${active ? "ring-2 ring-accent" : ""}`}
               >
                 {c.category ? (
                   <ProductImage src={c.image} alt="" className="size-14 rounded-full text-[10px] sm:size-18" />
@@ -106,7 +106,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                   </span>
                 )}
               </span>
-              <span className={`line-clamp-1 text-center text-xs sm:text-sm ${active ? "font-bold" : "text-muted group-hover:text-ink"}`}>
+              <span className={`line-clamp-2 text-center text-xs leading-5 ${active ? "font-bold text-accent" : "font-medium"}`}>
                 {c.category || "همه"}
               </span>
             </Link>
