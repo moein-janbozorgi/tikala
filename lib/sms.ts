@@ -31,7 +31,7 @@ function toOutbox(phone: string, message: string) {
 
 /** Sends a login code through the verify template. Throws a Persian message if SMS isn't set up. */
 export async function sendLoginCode(phone: string, code: string) {
-  if (consoleMode) return toOutbox(phone, `کد ورود تیکالا: ${code}`);
+  if (consoleMode) return toOutbox(phone, `کد ورود تیکلا: ${code}`);
   if (!key) throw new Error("سرویس پیامک تنظیم نشده است");
   try {
     await kavenegar("verify/lookup", { receptor: phone, token: code, template: process.env.KAVENEGAR_OTP_TEMPLATE ?? "verify" });
@@ -53,7 +53,7 @@ export async function notifyOrder(orderId: number, event: "placed" | "paid" | "s
     paid: `پرداخت سفارش ${n} انجام شد. کد پیگیری: ${order.ref_id ?? "-"}`,
     shipped: `سفارش ${n} ارسال شد. از خرید شما سپاسگزاریم.`,
   }[event];
-  const message = `تیکالا: ${text}`;
+  const message = `تیکلا: ${text}`;
   try {
     if (consoleMode) return toOutbox(order.phone, message);
     if (!key) return; // production without SMS configured: nothing to send

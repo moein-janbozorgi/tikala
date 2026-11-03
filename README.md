@@ -1,4 +1,4 @@
-# Tikala clothing shop (بوتیک تیکالا)
+# Tikala clothing shop (بوتیک تیکلا)
 
 A Persian (RTL) clothing store built with Next.js and Node's built-in SQLite. It has no external database or services.
 
@@ -46,7 +46,7 @@ Customers sign in with a mobile number and a 6-digit SMS code (email and passwor
 | Variable | Meaning |
 |---|---|
 | `KAVENEGAR_API_KEY` | API key from the Kavenegar panel |
-| `KAVENEGAR_OTP_TEMPLATE` | Name of your "verify lookup" template for login codes. Its text must contain `%token`, for example: «کد ورود تیکالا: %token» |
+| `KAVENEGAR_OTP_TEMPLATE` | Name of your "verify lookup" template for login codes. Its text must contain `%token`, for example: «کد ورود تیکلا: %token» |
 | `KAVENEGAR_SENDER` | Optional line number for order messages (Kavenegar's default line otherwise) |
 
 - Without an API key in development, messages are printed in the server console and saved to `data/sms-outbox.log`, so you can test logins.

@@ -7,6 +7,7 @@ import { getCart } from "@/lib/cart";
 import { db } from "@/lib/db";
 import { logout, setTheme } from "./actions";
 import { BagIcon, MenuIcon, MoonIcon, SunIcon, SystemIcon, UserIcon } from "./icons";
+import { Footer } from "./footer";
 import { SideMenu } from "./side-menu";
 import "./globals.css";
 
@@ -15,8 +16,8 @@ const vazirmatn = Vazirmatn({ variable: "--font-vazirmatn", subsets: ["arabic", 
 const lalezar = Lalezar({ variable: "--font-lalezar", weight: "400", subsets: ["arabic", "latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "تیکالا", template: "%s | تیکالا" },
-  description: "بوتیک تیکالا عرضه کننده انواع لباس و شلوار مد روز",
+  title: { default: "تیکلا", template: "%s | تیکلا" },
+  description: "بوتیک تیکلا عرضه کننده انواع لباس و شلوار مد روز",
 };
 
 // Every page shows the cart and login state from cookies, and products come from the database.
@@ -52,7 +53,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               <MenuIcon />
             </button>
             <Link href="/" className="flex items-center gap-2 font-display text-2xl">
-              تیکالا
+              تیکلا
             </Link>
             <div className="ms-auto flex items-center gap-1 text-sm sm:gap-2">
               {user?.is_admin ? (
@@ -100,12 +101,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </header>
         <SideMenu categories={categories} />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
-        <footer className="border-t border-line">
-          <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-2 px-4 py-6 text-sm text-muted">
-            <span>بوتیک تیکالا</span>
-            <span>پرداخت آنلاین یا هنگام تحویل</span>
-          </div>
-        </footer>
+        <Footer categories={categories} />
       </body>
     </html>
   );

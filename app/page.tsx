@@ -69,7 +69,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         <section className="mb-10 flex items-center justify-between gap-6 rounded-3xl bg-brand px-6 py-12 text-brand-ink sm:px-12 sm:py-16">
           <div>
             <h1 className="max-w-lg font-display text-4xl leading-tight sm:text-6xl sm:leading-tight">استایل هر روزت را این‌جا پیدا کن</h1>
-            <p className="mt-4 max-w-md leading-7 text-brand-ink/75">بوتیک تیکالا عرضه کننده انواع لباس و شلوار مد روز</p>
+            <p className="mt-4 max-w-md leading-7 text-brand-ink/75">بوتیک تیکلا عرضه کننده انواع لباس و شلوار مد روز</p>
           </div>
           {/* The PNG has a white background, so it sits in a white circle to look intentional in both themes. */}
           <div className="grid size-24 shrink-0 place-items-center overflow-hidden rounded-full bg-white p-4 sm:size-44 sm:p-8">

@@ -44,7 +44,7 @@ async function submitForm(path, marker, fields) {
 }
 // SMS: the server is started with SMS_CONSOLE=1, so codes and messages land in sms-outbox.log next to the database.
 const outbox = () => { try { return readFileSync(join(dirname(process.env.DB_PATH), "sms-outbox.log"), "utf8"); } catch { return ""; } };
-const latestCode = (phone) => [...outbox().matchAll(new RegExp(`\\t${phone}\\tکد ورود تیکالا: ([0-9]{6})`, "g"))].at(-1)?.[1];
+const latestCode = (phone) => [...outbox().matchAll(new RegExp(`\\t${phone}\\tکد ورود تیکلا: ([0-9]{6})`, "g"))].at(-1)?.[1];
 const check = (cond, msg) => { console.log((cond ? "PASS " : "FAIL ") + msg); if (!cond) process.exitCode = 1; };
 
 for (const p of ["/", "/product/1", "/cart", "/login", "/register"]) check((await get(p)).status === 200, `GET ${p} 200`);
@@ -179,7 +179,7 @@ check(saved?.name === "مریم\u200cالسادات احمدی", "name saved wit
 
 // Persian 404 page and per-product titles.
 check((await get("/product/999")).html.includes("صفحه پیدا نشد") && (await get("/no-such-page")).html.includes("صفحه پیدا نشد"), "Persian 404 page");
-check((await get("/product/1")).html.includes("<title>تی‌شرت نخی ساده | تیکالا</title>"), "product page title has product name");
+check((await get("/product/1")).html.includes("<title>تی‌شرت نخی ساده | تیکلا</title>"), "product page title has product name");
 
 // Login lockout: 5 failures in 15 minutes, then locked (unknown emails count too). Logged in: 0 logout, 1 theme, 2 login.
 const lockEmail = `lock${Date.now()}@test.com`;

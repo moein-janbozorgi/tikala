@@ -55,6 +55,43 @@ export const CloseIcon = () => (
     <path d="M6 6l12 12M18 6 6 18" />
   </Icon>
 );
+export const ChevronUpIcon = () => (
+  <Icon>
+    <path d="m6 15 6-6 6 6" />
+  </Icon>
+);
+export const TruckIcon = () => (
+  <Icon>
+    <path d="M2 5h12v10H2zM14 9h4l3 3v3h-7" />
+    <circle cx="6" cy="17" r="2" />
+    <circle cx="17" cy="17" r="2" />
+  </Icon>
+);
+export const CashIcon = () => (
+  <Icon>
+    <rect x="2" y="6" width="20" height="12" rx="2" />
+    <circle cx="12" cy="12" r="2.5" />
+    <path d="M6 12h.01M18 12h.01" />
+  </Icon>
+);
+export const CardIcon = () => (
+  <Icon>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <path d="M2 10h20M6 15h4" />
+  </Icon>
+);
+export const InstagramIcon = () => (
+  <Icon>
+    <rect x="3" y="3" width="18" height="18" rx="5" />
+    <circle cx="12" cy="12" r="4" />
+    <path d="M17.5 6.5h.01" />
+  </Icon>
+);
+export const TelegramIcon = () => (
+  <Icon>
+    <path d="M21 4 3 11l6 2 2 6 3-4 5 4 2-15ZM9 13l12-9" />
+  </Icon>
+);
 export const TrashIcon = () => (
   <Icon>
     <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
