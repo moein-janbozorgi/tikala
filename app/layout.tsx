@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Vazirmatn } from "next/font/google";
+import { Lalezar, Vazirmatn } from "next/font/google";
 import { getUser } from "@/lib/auth";
 import { getCart } from "@/lib/cart";
 import { db } from "@/lib/db";
@@ -12,6 +12,7 @@ import "./globals.css";
 
 
 const vazirmatn = Vazirmatn({ variable: "--font-vazirmatn", subsets: ["arabic", "latin"] });
+const lalezar = Lalezar({ variable: "--font-lalezar", weight: "400", subsets: ["arabic", "latin"] });
 
 export const metadata: Metadata = {
   title: { default: "تیکالا", template: "%s | تیکالا" },
@@ -43,14 +44,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   }
 
   return (
-    <html lang="fa" dir="rtl" data-theme={theme === "system" ? undefined : theme} className={`${vazirmatn.variable} h-full antialiased`}>
+    <html lang="fa" dir="rtl" data-theme={theme === "system" ? undefined : theme} className={`${vazirmatn.variable} ${lalezar.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
         <header className="sticky top-0 z-20 border-b border-line bg-page/85 backdrop-blur">
           <nav className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3">
             <button popoverTarget="side-menu" className="icon-btn" aria-label="دسته‌بندی محصولات" title="دسته‌بندی‌ها">
               <MenuIcon />
             </button>
-            <Link href="/" className="flex items-center gap-2 text-lg font-extrabold">
+            <Link href="/" className="flex items-center gap-2 font-display text-2xl">
               تیکالا
             </Link>
             <div className="ms-auto flex items-center gap-1 text-sm sm:gap-2">

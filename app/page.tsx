@@ -7,6 +7,7 @@ import { BagIcon } from "./icons";
 import { LoadMore } from "./load-more";
 import { ProductImage } from "./product-image";
 import { QtyStepper } from "./qty-stepper";
+import { SearchInput } from "./search-input";
 
 const PAGE_SIZE = 12;
 
@@ -61,11 +62,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     <>
       <ErrorMessage error={typeof params.error === "string" ? params.error : undefined} />
       {category || q ? null : (
-        <section className="mb-10 flex items-center justify-between gap-6 rounded-3xl bg-surface-2 px-6 py-12 sm:px-12 sm:py-16">
+        <section className="mb-10 flex items-center justify-between gap-6 rounded-3xl bg-brand px-6 py-12 text-brand-ink sm:px-12 sm:py-16">
           <div>
-            <p className="text-sm font-medium text-accent">کالکشن فصل</p>
-            <h1 className="mt-3 max-w-lg text-3xl leading-tight font-extrabold sm:text-5xl sm:leading-tight">استایل هر روزت را این‌جا پیدا کن</h1>
-            <p className="mt-4 max-w-md leading-7 text-muted">بوتیک تیکالا عرضه کننده انواع لباس و شلوار مد روز</p>
+            <h1 className="max-w-lg font-display text-4xl leading-tight sm:text-6xl sm:leading-tight">استایل هر روزت را این‌جا پیدا کن</h1>
+            <p className="mt-4 max-w-md leading-7 text-brand-ink/75">بوتیک تیکالا عرضه کننده انواع لباس و شلوار مد روز</p>
           </div>
           {/* The PNG has a white background, so it sits in a white circle to look intentional in both themes. */}
           <div className="grid size-24 shrink-0 place-items-center overflow-hidden rounded-full bg-white p-4 sm:size-44 sm:p-8">
@@ -77,7 +77,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       <form action="/" role="search" className="mb-4 flex gap-2">
         {category ? <input type="hidden" name="category" value={category} /> : null}
         {type ? <input type="hidden" name="type" value={type} /> : null}
-        <input type="search" name="q" defaultValue={q} placeholder="جستجوی محصول…" aria-label="جستجوی محصول" maxLength={50} className="input" />
+        <SearchInput defaultValue={q} />
         <button className="btn shrink-0">جستجو</button>
       </form>
 
@@ -111,10 +111,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           return (
             <article
               key={p.id}
-              className="group flex flex-col rounded-3xl border border-line bg-surface p-2 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/10 sm:p-2.5"
+              className="group flex flex-col rounded-2xl border border-line bg-surface p-2 sm:p-2.5"
             >
               <Link href={`/product/${p.id}`} className="block">
-                <div className="relative overflow-hidden rounded-2xl">
+                <div className="relative overflow-hidden rounded-xl">
                   <ProductImage
                     src={p.image}
                     alt={p.name}
@@ -132,7 +132,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 <div className="px-1.5 pt-3">
                   <p className="text-[11px] text-muted">{p.category}</p>
                   {/* Two lines kept even for short names, so prices and buttons line up across a row. */}
-                  <h2 className="mt-1 line-clamp-2 min-h-[2lh] text-sm leading-6 font-bold transition group-hover:text-accent sm:text-base sm:leading-6">
+                  <h2 className="mt-1 line-clamp-2 min-h-[2lh] text-sm leading-6 font-bold sm:text-base sm:leading-6">
                     {p.name}
                   </h2>
                   <p className="mt-2 flex items-baseline gap-1">
@@ -143,13 +143,21 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               </Link>
               {variants.length ? (
                 <form action={addToCart} className="mt-auto space-y-2 px-0.5 pt-3 pb-0.5">
-                  <select name="variantId" aria-label={`سایز و رنگ ${p.name}`} className="input rounded-full bg-page py-1.5 text-xs sm:text-sm">
-                    {variants.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.size} · {v.color}
-                      </option>
-                    ))}
-                  </select>
+                  <fieldset>
+                    <legend className="sr-only">سایز و رنگ {p.name}</legend>
+                    <div className="flex flex-wrap gap-1.5">
+                      {variants.map((v, i) => (
+                        <label
+                          key={v.id}
+                          title={`موجودی: ${v.stock.toLocaleString("fa-IR")}`}
+                          className="chip px-2.5 py-1 text-xs has-checked:chip-active has-focus-visible:ring-2 has-focus-visible:ring-accent"
+                        >
+                          <input type="radio" name="variantId" value={v.id} defaultChecked={i === 0} required className="sr-only" />
+                          {v.size} · {v.color}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
                   <div className="flex items-center gap-1.5">
                     <QtyStepper max={Math.max(...variants.map((v) => v.stock))} />
                     <button className="btn min-w-0 flex-1 px-2">

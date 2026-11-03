@@ -3,14 +3,16 @@
 /* Each token is defined once: light-dark() follows color-scheme, which data-theme pins, or the OS decides. */
 :root {
   color-scheme: light dark;
-  --page: light-dark(#faf8f5, #121010);
-  --surface: light-dark(#ffffff, #1c1917);
-  --surface-2: light-dark(#f2ede6, #282321);
-  --line: light-dark(#e6dfd5, #36302c);
-  --ink: light-dark(#1f1a17, #f2ede8);
-  --muted: light-dark(#6b6159, #a89d94);
-  --accent: light-dark(#9a3f1f, #ec8a62);
-  --accent-ink: light-dark(#ffffff, #1a100c);
+  --page: light-dark(#f4f5f9, #0e1222);
+  --surface: light-dark(#ffffff, #161b2e);
+  --surface-2: light-dark(#e9ecf4, #1f263d);
+  --line: light-dark(#d9dde8, #2c3450);
+  --ink: light-dark(#141a33, #eef0f8);
+  --muted: light-dark(#586079, #9aa2bd);
+  --accent: light-dark(#3b3fb6, #a5adff);
+  /* The yellow of the tik logo: buy buttons and the hero. Text on it stays navy in both themes. */
+  --brand: light-dark(#ffc928, #f5c232);
+  --brand-ink: #141a33;
   --danger: light-dark(#b42318, #f97066);
   --success: light-dark(#067647, #47cd89);
 }
@@ -24,6 +26,7 @@
 
 @theme inline {
   --font-sans: var(--font-vazirmatn);
+  --font-display: var(--font-lalezar);
   --color-page: var(--page);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
@@ -31,7 +34,8 @@
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
   --color-danger: var(--danger);
   --color-success: var(--success);
 }
@@ -48,7 +52,7 @@ body {
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-accent-ink transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-brand-ink transition hover:brightness-95 disabled:pointer-events-none disabled:opacity-40;
   }
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-full border border-line px-4 py-2 text-sm transition hover:bg-surface-2;
