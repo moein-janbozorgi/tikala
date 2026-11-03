@@ -63,6 +63,9 @@ body {
   .input {
     @apply w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-ink transition placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/25 focus:outline-none;
   }
+  .input[aria-invalid="true"] {
+    @apply border-danger focus:border-danger focus:ring-danger/25;
+  }
   .card {
     @apply rounded-2xl border border-line bg-surface p-5;
   }

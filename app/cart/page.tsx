@@ -4,6 +4,7 @@ import { getCartLines } from "@/lib/cart";
 import { getFlash } from "@/lib/flash";
 import { FREE_SHIPPING_FROM, shippingCost, toman } from "@/lib/format";
 import { checkout, updateCartItem } from "../actions";
+import { FieldError, ValidatedForm } from "../validated-form";
 import { AddressFields } from "./address-fields";
 import { ErrorMessage } from "../error-message";
 import { BagIcon, MinusIcon, PlusIcon, TrashIcon } from "../icons";
@@ -113,10 +114,11 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
           <span>{toman(total + shipping)}</span>
         </p>
         {user ? (
-          <form action={checkout} className="space-y-4 border-t border-line pt-5">
+          <ValidatedForm action={checkout} className="space-y-4 border-t border-line pt-5">
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium">نام گیرنده</span>
               <input name="name" defaultValue={typed.name ?? user.name} required maxLength={50} autoComplete="name" className="input" />
+              <FieldError name="name" label="نام گیرنده" />
             </label>
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium">شماره موبایل</span>
@@ -130,6 +132,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
                 required
                 className="input text-right"
               />
+              <FieldError name="phone" label="شماره موبایل" />
             </label>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               <AddressFields province={typed.province} city={typed.city} />
@@ -147,6 +150,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
                 autoComplete="street-address"
                 className="input"
               />
+              <FieldError name="address" label="آدرس کامل" />
             </label>
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium">کد پستی (۱۰ رقم)</span>
@@ -158,9 +162,10 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
                 dir="ltr"
                 required
                 pattern="[\s\-0-9۰-۹]{10,12}"
-                title="کد پستی ۱۰ رقمی"
+                title="کد پستی باید ۱۰ رقم باشد."
                 className="input text-right"
               />
+              <FieldError name="postal_code" label="کد پستی" />
             </label>
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium">روش پرداخت</legend>
@@ -177,7 +182,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
               </div>
             </fieldset>
             <button className="btn w-full">ثبت سفارش و پرداخت</button>
-          </form>
+          </ValidatedForm>
         ) : (
           <Link href="/login?next=/cart" className="btn w-full">
             برای ثبت سفارش وارد شوید

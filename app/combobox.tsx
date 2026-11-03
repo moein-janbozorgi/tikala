@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { FieldError, useRecheck } from "./validated-form";
 
 /** Text input with a filtered suggestion list. `hint` explains a value that is not one of the options. */
 export function Combobox({
@@ -27,6 +28,8 @@ export function Combobox({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const id = useId();
+  const recheck = useRecheck();
+  useEffect(() => recheck(name), [recheck, name, value]);
 
   const typed = value.trim();
   // An exact match lists everything so the user can switch; otherwise filter by what was typed.
@@ -107,6 +110,7 @@ export function Combobox({
           </ul>
         ) : null}
       </div>
+      <FieldError name={name} label={label} />
       {hint && typed && !known.includes(typed) ? <p className="mt-1 text-xs text-muted">{hint(typed)}</p> : null}
     </div>
   );
