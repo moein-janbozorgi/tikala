@@ -110,7 +110,7 @@ test("phones and postal codes accept Persian digits and common prefixes", async 
 });
 
 test("SMS codes: right code passes, wrong ones count, 3 tries, 3-minute expiry, resend and hourly limits", async () => {
-  const { checkCode, consumeCode, createCode } = await import("../lib/otp.ts");
+  const { checkCode, consumeCode, createCode, smsAllowedForIp } = await import("../lib/otp.ts");
   const phone = "09120000001";
   let t = 2_000_000_000_000;
   const code = createCode(phone, t);
@@ -133,6 +133,11 @@ test("SMS codes: right code passes, wrong ones count, 3 tries, 3-minute expiry, 
   for (let i = 0; i < 5; i++) createCode("09120000005", (t += 61_000));
   assert.throws(() => createCode("09120000005", (t += 61_000)), /یک ساعت/, "6th code in an hour refused");
   assert.doesNotThrow(() => createCode("09120000005", t + 60 * 60_000), "allowed again after the hour");
+
+  for (let i = 0; i < 10; i++) assert.ok(smsAllowedForIp("1.2.3.4", t + i), "10 codes per IP per hour");
+  assert.equal(smsAllowedForIp("1.2.3.4", t + 10), false, "11th code from the same IP refused");
+  assert.ok(smsAllowedForIp("5.6.7.8", t + 10), "other IPs unaffected");
+  assert.ok(smsAllowedForIp("1.2.3.4", t + 60 * 60_000), "allowed again after the hour");
 });
 
 test("?next= only allows same-site paths", async () => {

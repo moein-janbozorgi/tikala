@@ -10,7 +10,7 @@ import { getCart, setCart } from "@/lib/cart";
 import { clearFlash, setFlash } from "@/lib/flash";
 import { PROVINCES } from "@/lib/format";
 import { clearLoginFailures, hashPassword, loginLocked, passwordProblem, recordLoginFailure, verifyPassword } from "@/lib/password";
-import { checkCode, consumeCode, createCode } from "@/lib/otp";
+import { checkCode, consumeCode, createCode, smsAllowedForIp } from "@/lib/otp";
 import { notifyOrder, sendLoginCode } from "@/lib/sms";
 import { emailProblem, nameProblem, normalizePhone, normalizePostalCode, safeNext, toLatinDigits } from "@/lib/validation";
 
@@ -41,6 +41,9 @@ export async function updateCartItem(form: FormData) {
   await setCart(cart);
   redirect("/cart");
 }
+
+/** The visitor's IP. Runs behind Nginx, whose $proxy_add_x_forwarded_for appends the real client IP last; earlier entries can be forged. */
+const clientIp = async () => (await headers()).get("x-forwarded-for")?.split(",").at(-1)?.trim() || "unknown";
 
 /** Like fail(), but first saves what the user typed so the form comes back filled in. */
 async function failWithValues(path: string, message: string, form: string, values: Record<string, string>): Promise<never> {
@@ -153,6 +156,7 @@ export async function requestCode(form: FormData) {
   const phone = normalizePhone(str(form, "phone"));
   if (!phone) fail(back, "شماره موبایل معتبر نیست (مثال: 09121234567)");
   if (purpose === "link" && db.prepare("SELECT 1 FROM users WHERE phone = ?").get(phone)) fail(back, "این شماره برای حساب دیگری ثبت شده است");
+  if (!smsAllowedForIp(await clientIp())) fail(back, "تعداد درخواست کد از این دستگاه بیش از حد مجاز است؛ یک ساعت دیگر تلاش کنید");
 
   let error = "";
   try {

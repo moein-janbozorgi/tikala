@@ -51,7 +51,8 @@ Customers sign in with a mobile number and a 6-digit SMS code (email and passwor
 
 - Without an API key in development, messages are printed in the server console and saved to `data/sms-outbox.log`, so you can test logins.
 - In production without a key, phone login shows «سرویس پیامک تنظیم نشده است» and no order messages are sent. `SMS_CONSOLE=1` forces console mode (used by the e2e test).
-- Code rules: valid 3 minutes, 3 tries, one resend per minute, at most 5 codes per number per hour.
+- Code rules: valid 3 minutes, 3 tries, one resend per minute, at most 5 codes per number and 10 per visitor IP per hour.
+- The per-IP limit expects Nginx (or another proxy) in front, setting `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` (or `$remote_addr`). Without a proxy, visitors can fake their IP.
 - **Forgot password:** add a mobile number in the account page, then sign in with a code and set a new password there.
 
 ## Product photos

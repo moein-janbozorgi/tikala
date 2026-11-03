@@ -1,11 +1,13 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { db } from "./db.ts";
 
-// One-time SMS login codes: 6 digits, valid 3 minutes, 3 tries each, one resend per minute, 5 sends per phone per hour.
+// One-time SMS login codes: 6 digits, valid 3 minutes, 3 tries each, one resend per minute, 5 sends per phone per hour,
+// 10 sends per IP per hour (so nobody can run up the SMS bill by asking codes for thousands of numbers).
 const VALID_FOR = 3 * 60 * 1000;
 const RESEND_AFTER = 60 * 1000;
 const HOUR = 60 * 60 * 1000;
 const MAX_SENDS_PER_HOUR = 5;
+const MAX_SENDS_PER_IP_PER_HOUR = 10;
 const MAX_TRIES = 3;
 const hash = (phone: string, code: string) => createHash("sha256").update(`${phone}:${code}`).digest();
 
@@ -39,6 +41,18 @@ export function checkCode(phone: string, code: string, now = Date.now()) {
   if (!saved || saved.expires_at < now || saved.attempts >= MAX_TRIES) return "کد منقضی شده است؛ کد جدید بگیرید";
   db.prepare("UPDATE otp_codes SET attempts = attempts + 1 WHERE phone = ?").run(phone);
   return timingSafeEqual(hash(phone, code), Buffer.from(saved.code_hash, "hex")) ? null : "کد وارد شده اشتباه است";
+}
+
+// shortcut: per-IP counts live in this server's memory, so a restart clears them and several servers wouldn't share
+// them; move them to the database if the shop ever runs on more than one server.
+const ipSends = new Map<string, number[]>();
+
+/** Records a code request from this IP; false once it has asked for 10 in the last hour. */
+export function smsAllowedForIp(ip: string, now = Date.now()) {
+  const recent = (ipSends.get(ip) ?? []).filter((t) => now - t < HOUR);
+  const allowed = recent.length < MAX_SENDS_PER_IP_PER_HOUR;
+  ipSends.set(ip, allowed ? [...recent, now] : recent);
+  return allowed;
 }
 
 /** Code accepted and acted on: delete it so it can't be used again. */
