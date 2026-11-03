@@ -73,7 +73,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
             </fieldset>
             <div className="flex gap-3">
               {firstInStock ? <QtyStepper max={Math.max(...variants.map((v) => v.stock))} /> : null}
-              <button className="btn flex-1" disabled={!firstInStock}>
+              <button className="btn px-8" disabled={!firstInStock}>
                 {firstInStock ? "خرید" : "ناموجود"}
               </button>
             </div>
