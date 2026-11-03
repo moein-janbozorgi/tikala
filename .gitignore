@@ -25,8 +25,8 @@
 /tmp/
 sms-outbox.log
 
-# personal Claude Code settings for this machine
-.claude/settings.local.json
+# Claude Code settings and skill copies for this machine (shared skills live in .agents/)
+.claude/
 
 # misc
 .DS_Store
