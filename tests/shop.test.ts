@@ -134,6 +134,15 @@ test("SMS codes: right code passes, wrong ones count, 5 tries, 3-minute expiry, 
   assert.doesNotThrow(() => createCode("09120000005", t + 60 * 60_000), "allowed again after the hour");
 });
 
+test("?next= only allows same-site paths", async () => {
+  const { safeNext } = await import("../lib/validation.ts");
+  for (const bad of ["/\\evil.com", "//evil.com", "/\t/evil.com", "https://evil.com", "javascript:alert(1)", 42, undefined]) {
+    assert.equal(safeNext(bad), "/", `rejects ${String(bad)}`);
+  }
+  assert.equal(safeNext("/cart?x=1#top"), "/cart?x=1#top");
+  assert.equal(safeNext("/admin"), "/admin");
+});
+
 test("passwords verify only with the right password", async () => {
   const stored = await hashPassword("secret123");
   assert.ok(await verifyPassword("secret123", stored));

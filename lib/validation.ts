@@ -25,6 +25,15 @@ export function normalizePostalCode(raw: string) {
   return /^\d{10}$/.test(digits) ? digits : null;
 }
 
+/**
+ * Only same-site paths, so ?next= can't send users to another site. Resolved the way a browser would, so tricks like
+ * "/\evil.com" or "/<tab>/evil.com" (both read as "//evil.com") can't leave the site either.
+ */
+export function safeNext(next: unknown) {
+  const url = typeof next === "string" ? URL.parse(next, "http://x") : null;
+  return url?.origin === "http://x" ? url.pathname + url.search + url.hash : "/";
+}
+
 export function emailProblem(email: string) {
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(email)) return "ایمیل معتبر نیست (مثال: name@example.com)";
   return null;

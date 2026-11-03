@@ -5,14 +5,14 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { db, placeOrder, type CheckoutInfo } from "@/lib/db";
 import { startPayment } from "@/lib/zarinpal";
-import { endSession, requireUser, safeNext, startSession } from "@/lib/auth";
+import { endSession, requireUser, startSession } from "@/lib/auth";
 import { getCart, setCart } from "@/lib/cart";
 import { clearFlash, setFlash } from "@/lib/flash";
 import { PROVINCES } from "@/lib/format";
 import { clearLoginFailures, hashPassword, loginLocked, passwordProblem, recordLoginFailure, verifyPassword } from "@/lib/password";
 import { checkCode, consumeCode, createCode } from "@/lib/otp";
 import { notifyOrder, sendLoginCode } from "@/lib/sms";
-import { emailProblem, nameProblem, normalizePhone, normalizePostalCode, toLatinDigits } from "@/lib/validation";
+import { emailProblem, nameProblem, normalizePhone, normalizePostalCode, safeNext, toLatinDigits } from "@/lib/validation";
 
 const str = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
 const fail = (path: string, message: string): never =>

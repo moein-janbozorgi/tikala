@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { safeNext } from "@/lib/auth";
-import { normalizePhone } from "@/lib/validation";
+import { normalizePhone, safeNext } from "@/lib/validation";
 import { requestCode, verifyCode } from "../../actions";
 import { ErrorMessage } from "../../error-message";
 

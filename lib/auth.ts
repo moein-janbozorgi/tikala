@@ -61,8 +61,3 @@ export async function requireAdmin() {
   if (!user?.is_admin) redirect("/login?next=/admin");
   return user;
 }
-
-/** Only same-site paths, so ?next= can't send users to another site. */
-export function safeNext(next: unknown) {
-  return typeof next === "string" && next.startsWith("/") && !next.startsWith("//") ? next : "/";
-}
