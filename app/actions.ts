@@ -15,8 +15,12 @@ import { notifyOrder, sendLoginCode } from "@/lib/sms";
 import { emailProblem, errorParam, nameProblem, normalizePhone, normalizePostalCode, safeNext, toLatinDigits } from "@/lib/validation";
 
 const str = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
-const fail = (path: string, message: string): never =>
-  redirect(`${path}${path.includes("?") ? "&" : "?"}error=${errorParam(message)}`);
+const fail = (path: string, message: string, key = "error"): never =>
+  redirect(`${path}${path.includes("?") ? "&" : "?"}${key}=${errorParam(message)}`);
+/** The page the login modal was open over (sent as `from`), with the modal's params added. */
+const authUrl = (from: string, params: Record<string, string>) => `${from}${from.includes("?") ? "&" : "?"}${new URLSearchParams(params)}`;
+// The modal has its own error param, so the page under it doesn't show the same message.
+const authFail = (path: string, message: string) => fail(path, message, "auth_error");
 
 export async function addToCart(form: FormData) {
   const variantId = Number(form.get("variantId"));
@@ -47,9 +51,9 @@ const clientIp = async () => (await headers()).get("x-forwarded-for")?.split(","
 const LOCKED = "تعداد تلاش بیش از حد مجاز است؛ ۱۵ دقیقه دیگر دوباره تلاش کنید";
 
 /** Like fail(), but first saves what the user typed so the form comes back filled in. */
-async function failWithValues(path: string, message: string, form: string, values: Record<string, string>): Promise<never> {
+async function failWithValues(path: string, message: string, form: string, values: Record<string, string>, key?: string): Promise<never> {
   await setFlash(form, values);
-  return fail(path, message);
+  return fail(path, message, key);
 }
 
 export async function checkout(form: FormData) {
@@ -101,20 +105,21 @@ async function goToGateway(orderId: number) {
   redirect(url);
 }
 
-/** Login and sign-up are for signed-out visitors; the pages show a modal instead, this stops a form posted anyway. */
+/** Login and sign-up are for signed-out visitors; the modal isn't shown to others, this stops a form posted anyway. */
 async function refuseIfSignedIn() {
-  if (await getUser()) redirect("/login");
+  if (await getUser()) redirect("/");
 }
 
 export async function register(form: FormData) {
   await refuseIfSignedIn();
   const next = safeNext(form.get("next"));
-  const back = `/register?next=${encodeURIComponent(next)}`;
+  const back = authUrl(safeNext(form.get("from")), { auth: "register", next });
   const name = str(form, "name").replace(/\s+/g, " ");
   const email = str(form, "email").toLowerCase();
   const password = String(form.get("password") ?? "");
   // Name and email come back after an error; passwords never do.
-  const reject = (message: string) => failWithValues(back, message, "register", { name: str(form, "name"), email: str(form, "email") });
+  const reject = (message: string) =>
+    failWithValues(back, message, "register", { name: str(form, "name"), email: str(form, "email") }, "auth_error");
   const problem = nameProblem(name) ?? emailProblem(email) ?? passwordProblem(password, String(form.get("confirm") ?? ""));
   if (problem) await reject(problem);
   // "Already registered" tells whether an email has an account, so trying taken emails counts like a failed login:
@@ -142,18 +147,18 @@ export async function register(form: FormData) {
 export async function login(form: FormData) {
   await refuseIfSignedIn();
   const next = safeNext(form.get("next"));
-  const back = `/login?next=${encodeURIComponent(next)}`;
+  const back = authUrl(safeNext(form.get("from")), { auth: "login", next });
   const email = str(form, "email").toLowerCase();
   // Checked before the password, and unknown emails count too, so the lock reveals nothing about which accounts exist.
   const ip = await clientIp();
-  if (loginLocked(email, ip)) fail(back, LOCKED);
+  if (loginLocked(email, ip)) authFail(back, LOCKED);
   const user = db.prepare("SELECT id, password_hash FROM users WHERE email = ?").get(email) as
     | { id: number; password_hash: string | null }
     | undefined;
   // Accounts created by phone have no password until the owner sets one in their account page.
   if (!user?.password_hash || !(await verifyPassword(String(form.get("password") ?? ""), user.password_hash))) {
     recordLoginFailure(email, ip);
-    fail(back, "ایمیل یا رمز عبور اشتباه است");
+    authFail(back, "ایمیل یا رمز عبور اشتباه است");
   }
   clearLoginFailures(email);
   await startSession(user!.id);
@@ -167,13 +172,16 @@ const purposeOf = (form: FormData) => (form.get("purpose") === "link" ? "link" :
 export async function requestCode(form: FormData) {
   const purpose = purposeOf(form);
   const next = safeNext(form.get("next"));
-  const back = purpose === "link" ? "/account" : `/login?next=${encodeURIComponent(next)}`;
+  // Linking starts from the account page's own form; login from the modal, over whatever page it was opened on.
+  const from = purpose === "link" ? "/account" : safeNext(form.get("from"));
   if (purpose === "link") await requireUser("/account");
   else await refuseIfSignedIn();
+  // Linking reports errors on the account page itself; login in the modal.
+  const reject = (message: string) => (purpose === "link" ? fail(from, message) : authFail(authUrl(from, { auth: "login", next }), message));
   const phone = normalizePhone(str(form, "phone"));
-  if (!phone) fail(back, "شماره موبایل معتبر نیست (مثال: 09121234567)");
-  if (purpose === "link" && db.prepare("SELECT 1 FROM users WHERE phone = ?").get(phone)) fail(back, "این شماره برای حساب دیگری ثبت شده است");
-  if (!smsAllowedForIp(await clientIp())) fail(back, "تعداد درخواست کد از این دستگاه بیش از حد مجاز است؛ یک ساعت دیگر تلاش کنید");
+  if (!phone) reject("شماره موبایل معتبر نیست (مثال: 09121234567)");
+  if (purpose === "link" && db.prepare("SELECT 1 FROM users WHERE phone = ?").get(phone)) reject("این شماره برای حساب دیگری ثبت شده است");
+  if (!smsAllowedForIp(await clientIp())) reject("تعداد درخواست کد از این دستگاه بیش از حد مجاز است؛ یک ساعت دیگر تلاش کنید");
 
   let error = "";
   try {
@@ -181,19 +189,20 @@ export async function requestCode(form: FormData) {
   } catch (e) {
     error = e instanceof Error ? e.message : "ارسال کد ناموفق بود";
   }
-  if (error) fail(back, error);
-  redirect(`/login/verify?${new URLSearchParams({ phone: phone!, next, purpose })}`);
+  if (error) reject(error);
+  redirect(authUrl(from, { auth: "verify", mobile: phone!, next, purpose }));
 }
 
 export async function verifyCode(form: FormData) {
   const purpose = purposeOf(form);
   if (purpose === "login") await refuseIfSignedIn();
   const next = safeNext(form.get("next"));
+  const from = purpose === "link" ? "/account" : safeNext(form.get("from"));
   const phone = normalizePhone(str(form, "phone"));
-  if (!phone) fail("/login", "شماره موبایل معتبر نیست");
-  const back = `/login/verify?${new URLSearchParams({ phone: phone!, next, purpose })}`;
+  if (!phone) authFail(authUrl(from, { auth: "login", next }), "شماره موبایل معتبر نیست");
+  const back = authUrl(from, { auth: "verify", mobile: phone!, next, purpose });
   const codeError = checkCode(phone!, toLatinDigits(str(form, "code")));
-  if (codeError) fail(back, codeError);
+  if (codeError) authFail(back, codeError);
 
   if (purpose === "link") {
     const user = await requireUser("/account");
@@ -212,7 +221,7 @@ export async function verifyCode(form: FormData) {
     // New number: the code was right, but it stays valid until the name is fixed, so a typo doesn't cost a new SMS.
     const name = str(form, "name").replace(/\s+/g, " ");
     const nameError = nameProblem(name);
-    if (nameError) fail(back, `برای ساخت حساب جدید نام را وارد کنید: ${nameError}`);
+    if (nameError) authFail(back, `برای ساخت حساب جدید نام را وارد کنید: ${nameError}`);
     user = db.prepare("INSERT INTO users (name, phone) VALUES (?, ?) ON CONFLICT (phone) DO UPDATE SET phone = phone RETURNING id").get(name, phone) as { id: number };
   }
   consumeCode(phone!);

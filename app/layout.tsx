@@ -29,7 +29,7 @@ const THEMES = {
   dark: { label: "تیره", icon: <MoonIcon />, next: "system" },
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
   const user = await getUser();
   const count = Object.values(await getCart()).reduce((a, b) => a + (Number.isInteger(b) && b > 0 ? b : 0), 0);
   const saved = (await cookies()).get("theme")?.value;
@@ -72,7 +72,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   </form>
                 </>
               ) : (
-                <Link href="/login" className="rounded-full px-3 py-2 hover:bg-surface-2">
+                // Query-only href: opens the login modal over the current page.
+                <Link href="?auth=login" scroll={false} className="rounded-full px-3 py-2 hover:bg-surface-2">
                   ورود / ثبت‌نام
                 </Link>
               )}
@@ -102,6 +103,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <SideMenu categories={categories} />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
         <Footer categories={categories} />
+        {auth}
       </body>
     </html>
   );

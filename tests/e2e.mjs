@@ -57,34 +57,33 @@ async function guest(fn) {
   }
 }
 
-for (const p of ["/", "/product/1", "/cart", "/login", "/register"]) check((await get(p)).status === 200, `GET ${p} 200`);
+for (const p of ["/", "/product/1", "/cart", "/?auth=login", "/?auth=register"]) check((await get(p)).status === 200, `GET ${p} 200`);
 check((await get("/product/999")).status === 404, "unknown product 404");
 check((await get("/admin")).status !== 200, "admin blocked for guests");
 
 const email = `e2e${Date.now()}@test.com`;
-// guests: 0 = theme form, 1 = page form
-let r = await submit("/register?next=/cart", 1, { name: "تست", email, password: "short", confirm: "short", next: "/cart" });
+let r = await submitForm("/?auth=register&next=/cart", 'name="confirm"', { name: "تست", email, password: "short", confirm: "short", next: "/cart" });
 check(r.location?.includes("error="), "short password rejected (server)");
-r = await submit("/register?next=/cart", 1, { name: "تست", email, password: "passwordonly", confirm: "passwordonly", next: "/cart" });
+r = await submitForm("/?auth=register&next=/cart", 'name="confirm"', { name: "تست", email, password: "passwordonly", confirm: "passwordonly", next: "/cart" });
 check(decodeURIComponent(r.location ?? "").includes("یک حرف و یک عدد"), "password without digit rejected");
-r = await submit("/register?next=/cart", 1, { name: "تست", email, password: "password123", confirm: "password124", next: "/cart" });
+r = await submitForm("/?auth=register&next=/cart", 'name="confirm"', { name: "تست", email, password: "password123", confirm: "password124", next: "/cart" });
 check(decodeURIComponent(r.location ?? "").includes("یکسان نیستند"), "mismatched confirmation rejected");
-r = await submit("/register?next=/cart", 1, { name: "تست", email, password: "short", confirm: "short", next: "/cart" });
+r = await submitForm("/?auth=register&next=/cart", 'name="confirm"', { name: "تست", email, password: "short", confirm: "short", next: "/cart" });
 check(r.location?.includes("error="), "short password rejected");
-r = await submit("/register?next=/cart", 1, { name: "تست", email, password: "password123", confirm: "password123", next: "/cart" });
+r = await submitForm("/?auth=register&next=/cart", 'name="confirm"', { name: "تست", email, password: "password123", confirm: "password123", next: "/cart" });
 check(r.location === "/cart" && cookies.session, "register logs in and redirects to next");
-r = await guest(() => submit("/register", 1, { name: "x", email, password: "password123", confirm: "password123", next: "/" }));
+r = await guest(() => submitForm("/?auth=register", 'name="confirm"', { name: "x", email, password: "password123", confirm: "password123", next: "/" }));
 check(r.location?.includes("error="), "duplicate email rejected");
 
-// Signed in: login and register show a modal instead of their forms, and the login action itself refuses.
-const signedInLogin = (await get("/login")).html;
-const signedInRegister = (await get("/register")).html;
-check(signedInLogin.includes("شما وارد حساب کاربری شده‌اید") && !signedInLogin.includes('name="password"') && !signedInRegister.includes('name="confirm"'), "signed-in user gets the 'already signed in' modal, not the forms");
-const loginAction = (await guest(() => get("/login"))).html.match(/<form[\s\S]*?<\/form>/g).find((f) => f.includes('name="password"')).match(/name="(\$ACTION_ID_[^"]+)"/)[1];
+// Signed in: the login and register modals don't open, and the login action itself refuses.
+const signedInLogin = (await get("/?auth=login")).html;
+const signedInRegister = (await get("/?auth=register")).html;
+check(!signedInLogin.includes('name="password"') && !signedInRegister.includes('name="confirm"'), "signed-in user gets no login or register modal");
+const loginAction = (await guest(() => get("/?auth=login"))).html.match(/<form[\s\S]*?<\/form>/g).find((f) => f.includes('name="password"')).match(/name="(\$ACTION_ID_[^"]+)"/)[1];
 const loginPost = new FormData();
 for (const [k, v] of Object.entries({ [loginAction]: "", email, password: "password123", next: "/" })) loginPost.append(k, v);
-const refused = await fetch(base + "/login", { method: "POST", body: loginPost, headers: { cookie: cookieHeader(), origin: base }, redirect: "manual" });
-check(refused.headers.get("location") === "/login", "login action refuses a signed-in user");
+const refused = await fetch(base + "/", { method: "POST", body: loginPost, headers: { cookie: cookieHeader(), origin: base }, redirect: "manual" });
+check(refused.headers.get("location") === "/", "login action refuses a signed-in user");
 
 const productHtml = (await get("/product/1")).html;
 const variantId = Number(productHtml.match(/name="variantId" checked="" value="(\d+)"/)[1]);
@@ -184,8 +183,8 @@ check(cartQty(cartHtml) === "۱" && cartHtml.includes('aria-label="حذف از �
 r = await submitForm("/cart", `name="variantId" value="${cardVariant}"`, { variantId: cardVariant, qty: 0 });
 check(!(await get("/cart")).html.includes(`name="variantId" value="${cardVariant}"`), "remove button takes the item out of the cart");
 
-// Register form: name and email rules, as a guest (forms are 0 theme, 1 register); the admin session is kept.
-const reg = (fields) => guest(() => submit("/register", 1, { password: "password123", confirm: "password123", next: "/", ...fields }));
+// Register form: name and email rules, as a guest; the admin session is kept.
+const reg = (fields) => guest(() => submitForm("/?auth=register", 'name="confirm"', { password: "password123", confirm: "password123", next: "/", ...fields }));
 r = await reg({ name: "علی123", email: `n1${email}` });
 check(decodeURIComponent(r.location ?? "").includes("نام باید"), "invalid name rejected");
 r = await reg({ name: "علی رضایی", email: "bad@example" });
@@ -203,7 +202,7 @@ check((await get("/product/1")).html.includes("<title>تی‌شرت نخی سا�
 
 // Login lockout: 5 failures in 15 minutes, then locked (unknown emails count too).
 const lockEmail = `lock${Date.now()}@test.com`;
-const badLogin = () => guest(() => submitForm("/login", 'name="password"', { email: lockEmail, password: "wrong-password1", next: "/" }));
+const badLogin = () => guest(() => submitForm("/?auth=login", 'name="password"', { email: lockEmail, password: "wrong-password1", next: "/" }));
 for (let i = 0; i < 5; i++) r = await badLogin();
 check(decodeURIComponent(r.location ?? "").includes("اشتباه است"), "wrong password rejected");
 r = await badLogin();
@@ -279,25 +278,25 @@ check(orderCards((await get("/admin?q=" + encodeURIComponent("تست"))).html) >
 // ---------- Phone login, linking a phone, and "forgot password" ----------
 const p1 = "09350000001";
 r = await submitForm("/account", 'value="link"', { purpose: "link", phone: p1 });
-check(r.location?.startsWith("/login/verify?"), "link phone: code requested");
+check(r.location?.startsWith("/account?auth=verify&"), "link phone: code requested");
 r = await submitForm(r.location, 'name="code"', { phone: p1, next: "/", purpose: "link", code: latestCode(p1) });
 check(r.location === "/account?phone=1", "phone linked to the email account");
 check((await get("/admin")).status !== 200, "switching away from the admin number removes admin access");
 await submitForm("/", "خروج", {});
 check(!cookies.session, "logged out");
 
-r = await submitForm("/login", 'value="login"', { purpose: "login", next: "/account", phone: "۰۹۳۵۰۰۰۰۰۰۱" });
+r = await submitForm("/?auth=login&next=/account", 'value="login"', { purpose: "login", next: "/account", phone: "۰۹۳۵۰۰۰۰۰۰۱" });
 r = await submitForm(r.location, 'name="code"', { phone: p1, next: "/account", purpose: "login", code: latestCode(p1) });
 check(r.location === "/account" && (await get("/account")).html.includes("تغییر رمز عبور"), "phone code signs into the existing email account");
 r = await submitForm("/account", 'name="confirm"', { password: "newpass123", confirm: "newpass123" });
 check(r.location === "/account?password=1", "new password set from the account page");
 await submitForm("/", "خروج", {});
-r = await submitForm("/login", 'name="password"', { email, password: "newpass123", next: "/" });
+r = await submitForm("/?auth=login", 'name="password"', { email, password: "newpass123", next: "/" });
 check(r.location === "/" && cookies.session, "forgot-password flow: email login works with the new password");
 await submitForm("/", "خروج", {});
 
 const p2 = "09350000002";
-r = await submitForm("/login", 'value="login"', { purpose: "login", next: "/", phone: p2 });
+r = await submitForm("/?auth=login", 'value="login"', { purpose: "login", next: "/", phone: p2 });
 const verifyUrl = r.location;
 check(/<button disabled=""[^>]*>ارسال دوباره کد تا/.test((await get(verifyUrl)).html), "resend button starts disabled with a countdown");
 r = await submitForm(verifyUrl, 'name="code"', { phone: p2, next: "/", purpose: "login", code: latestCode(p2) === "000000" ? "111111" : "000000" });
@@ -307,6 +306,6 @@ check(decodeURIComponent(r.location ?? "").includes("نام را وارد کنی
 r = await submitForm(verifyUrl, 'name="code"', { phone: p2, next: "/", purpose: "login", code: latestCode(p2), name: "کاربر موبایلی" });
 check(r.location === "/" && (await get("/")).html.includes("کاربر موبایلی"), "new phone-only account created and signed in");
 await submitForm("/", "خروج", {});
-r = await submitForm("/login", 'value="login"', { purpose: "login", next: "/", phone: p2 });
-r = await submitForm("/login", 'value="login"', { purpose: "login", next: "/", phone: p2 });
+r = await submitForm("/?auth=login", 'value="login"', { purpose: "login", next: "/", phone: p2 });
+r = await submitForm("/?auth=login", 'value="login"', { purpose: "login", next: "/", phone: p2 });
 check(decodeURIComponent(r.location ?? "").includes("صبر کنید"), "resending a code needs a 1-minute wait");

@@ -184,7 +184,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
             <button className="btn w-full">ثبت سفارش و پرداخت</button>
           </ValidatedForm>
         ) : (
-          <Link href="/login?next=/cart" className="btn w-full">
+          <Link href="/cart?auth=login" scroll={false} className="btn w-full">
             برای ثبت سفارش وارد شوید
           </Link>
         )}

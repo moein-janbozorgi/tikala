@@ -58,12 +58,13 @@ export async function getUser() {
 
 export async function requireUser(next: string) {
   const user = await getUser();
-  if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
+  // Opened over the home page: the page asked for can't be the background, it needs the login.
+  if (!user) redirect(`/?${new URLSearchParams({ auth: "login", next })}`);
   return user;
 }
 
 export async function requireAdmin() {
   const user = await getUser();
-  if (!user?.is_admin) redirect("/login?next=/admin");
+  if (!user?.is_admin) redirect("/?auth=login&next=/admin");
   return user;
 }

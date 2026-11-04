@@ -59,7 +59,7 @@ export function Footer({ categories }: { categories: { category: string }[] }) {
               <li><Link href="/" className="hover:text-ink">همه محصولات</Link></li>
               <li><Link href="/cart" className="hover:text-ink">سبد خرید</Link></li>
               <li><Link href="/account" className="hover:text-ink">حساب کاربری و سفارش‌ها</Link></li>
-              <li><Link href="/register" className="hover:text-ink">ثبت‌نام</Link></li>
+              <li><Link href="?auth=register" scroll={false} className="hover:text-ink">ثبت‌نام</Link></li>
             </ul>
           </nav>
           <nav aria-label="دسته‌بندی‌ها">
