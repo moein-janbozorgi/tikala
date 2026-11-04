@@ -193,7 +193,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       </nav>
 
       <nav aria-label="مرتب‌سازی" className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted">مرتب‌سازی:</span>
+        <span className="hidden text-muted sm:inline">مرتب‌سازی:</span>
         {Object.entries(SORTS).map(([value, [label]]) => (
           <Link
             key={value}
@@ -209,7 +209,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           href={link({ sale: sale ? undefined : "1" })}
           scroll={false}
           aria-current={sale ? "true" : undefined}
-          className={`chip ms-auto gap-1 px-3 py-1 ${sale ? "border-danger bg-danger text-page" : "text-danger"}`}
+          className={`chip gap-1 px-3 py-1 ${sale ? "border-danger bg-danger text-page" : "text-danger"}`}
         >
           حراج
         </Link>
