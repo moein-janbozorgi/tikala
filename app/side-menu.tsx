@@ -57,6 +57,11 @@ export function SideMenu({ categories }: { categories: Category[] }) {
           ),
         )}
       </nav>
+      <nav aria-label="تیکلا" className="border-t border-line p-3">
+        <Link href="/about" className="flex rounded-xl px-3 py-2.5 hover:bg-surface-2">
+          درباره ما
+        </Link>
+      </nav>
     </div>
   );
 }

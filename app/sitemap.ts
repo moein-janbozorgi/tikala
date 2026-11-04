@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const products = db.prepare("SELECT id FROM products WHERE active = 1 ORDER BY id").all() as { id: number }[];
   return [
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },
+    { url: `${SITE_URL}/about`, changeFrequency: "monthly", priority: 0.3 },
     ...categories.map((c) => ({ url: `${SITE_URL}/?${new URLSearchParams({ category: c.category })}`, changeFrequency: "daily" as const, priority: 0.8 })),
     ...products.map((p) => ({ url: `${SITE_URL}/product/${p.id}`, changeFrequency: "weekly" as const, priority: 0.6 })),
   ];

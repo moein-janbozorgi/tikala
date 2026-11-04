@@ -7,13 +7,13 @@ const PHONE = "06623237174";
 const EMAIL = "tikala@gmail.com"
 const ADDRESS = "خیابان انقلاب_بازار رضا_ طبقه همکف پلاک ۱۰۸"
 const HOURS = "شنبه تا پنجشنبه، ۹ تا ۱۸"
-const CONTACT = [
+export const CONTACT = [
   { label: "تلفن پشتیبانی", value: PHONE, href: `tel:${PHONE.replace(/[^\d+]/g, "")}` },
   { label: "ایمیل", value: EMAIL, href: `mailto:${EMAIL}` },
   { label: "آدرس", value: ADDRESS },
   { label: "ساعات پاسخگویی", value: HOURS },
 ].filter((c) => c.value);
-const SOCIAL = [
+export const SOCIAL = [
   { label: "اینستاگرام", href: "https://www.instagram.com/tikla_boutique/", icon: <InstagramIcon /> },
   { label: "تلگرام", href: "", icon: <TelegramIcon /> },
 ].filter((s) => s.href);
