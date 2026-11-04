@@ -401,21 +401,34 @@ export function purgeOrder(orderId: number) {
 }
 
 // Sample products so a fresh install isn't empty. Inside a transaction because build workers import this in parallel.
-transaction(() => {
-  if (db.prepare("SELECT 1 FROM products LIMIT 1").get()) return;
-  for (const [name, description, category, subcategory, price, image, variants] of SAMPLE_PRODUCTS) {
+function addSamples(samples: typeof SAMPLE_PRODUCTS) {
+  for (const [name, description, category, subcategory, price, image, variants] of samples) {
     const p = db
       .prepare("INSERT INTO products (name, description, category, subcategory, price, image) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")
       .get(name, description, category, subcategory, price, image) as { id: number };
     saveVariants(p.id, variants);
     db.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(category);
   }
+}
+const fillSizeGuide = (name: string) =>
+  db.prepare("UPDATE categories SET size_guide = ? WHERE name = ? AND size_guide = ''").run(SIZE_GUIDES[name], name);
+
+transaction(() => {
+  if (db.prepare("SELECT 1 FROM products LIMIT 1").get()) return;
+  addSamples(SAMPLE_PRODUCTS);
 });
 
 // v8: standard size charts for the starter categories. After the sample seed, so a fresh install's categories get them too.
 transaction(() => {
   if (schemaVersion() >= 8) return;
-  const fill = db.prepare("UPDATE categories SET size_guide = ? WHERE name = ? AND size_guide = ''");
-  for (const [name, guide] of Object.entries(SIZE_GUIDES)) fill.run(guide, name);
+  for (const name of Object.keys(SIZE_GUIDES)) fillSizeGuide(name);
   db.exec("PRAGMA user_version = 8");
+});
+
+// v9: the glasses category (sunglasses, optical frames, blue-light) for shops that were set up before it existed.
+transaction(() => {
+  if (schemaVersion() >= 9) return;
+  if (!db.prepare("SELECT 1 FROM products WHERE category = 'عینک'").get()) addSamples(SAMPLE_PRODUCTS.filter((s) => s[2] === "عینک"));
+  fillSizeGuide("عینک");
+  db.exec("PRAGMA user_version = 9");
 });
