@@ -76,6 +76,19 @@ body {
   .chip {
     @apply inline-flex cursor-pointer items-center rounded-full border border-line bg-surface px-4 py-1.5 text-sm transition hover:border-ink;
   }
+  /* Handles of the two stacked range inputs in app/price-range.tsx: only the handles take touches, so both can be dragged. */
+  .price-thumb::-webkit-slider-thumb {
+    @apply pointer-events-auto size-7 cursor-grab appearance-none rounded-full border-2 border-ink bg-surface shadow-md;
+  }
+  .price-thumb::-moz-range-thumb {
+    @apply pointer-events-auto size-7 cursor-grab rounded-full border-2 border-ink bg-surface shadow-md;
+  }
+  .price-thumb:focus-visible::-webkit-slider-thumb {
+    @apply ring-4 ring-accent/40;
+  }
+  .price-thumb:focus-visible::-moz-range-thumb {
+    @apply ring-4 ring-accent/40;
+  }
 }
 
 /* Browsers with customizable <select> also get the option list in the shop's style, like the combobox list; others keep

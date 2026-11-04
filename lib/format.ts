@@ -1,3 +1,6 @@
+/** The shop price slider moves in steps of this many Toman. */
+export const PRICE_STEP = 10_000;
+
 export const toman = (n: number) => `${n.toLocaleString("fa-IR")} تومان`;
 
 /** Whole percent off for a sale price ("price before discount" = compare); 0 when not on sale. */

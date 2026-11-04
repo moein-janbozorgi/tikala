@@ -60,6 +60,10 @@ async function guest(fn) {
 
 for (const p of ["/", "/product/1", "/cart", "/?auth=login", "/?auth=register"]) check((await get(p)).status === 200, `GET ${p} 200`);
 check((await get("/product/999")).status === 404, "unknown product 404");
+for (const range of ["min=1250000&max=1250000", "min=۱٬۲۵۰٬۰۰۰&max=1,250,000"]) {
+  const html = (await get(`/?${range}`)).html;
+  check(html.includes("شلوار جین راسته") && !html.includes("هودی دورس"), `price filter ${range}`);
+}
 check((await get("/admin")).status !== 200, "admin blocked for guests");
 
 const email = `e2e${Date.now()}@test.com`;

@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { db, type Product, type Variant } from "@/lib/db";
-import { percentOff, toman } from "@/lib/format";
-import { likeContains } from "@/lib/validation";
+import { percentOff, PRICE_STEP, toman } from "@/lib/format";
+import { likeContains, MAX_PRICE, toLatinDigits } from "@/lib/validation";
 import { addToCart } from "./actions";
 import { ErrorMessage } from "./error-message";
 import { FEATURES } from "./footer";
 import { BagCheckArt, BagIcon, GlassesIcon, GridIcon, HoodieIcon, JacketIcon, PantsIcon, ShirtIcon, ShoeIcon, SweaterIcon, TshirtIcon } from "./icons";
 import { LoadMore } from "./load-more";
+import { PriceRange } from "./price-range";
 import { ProductImage } from "./product-image";
 import { QtyStepper } from "./qty-stepper";
 import { SearchInput } from "./search-input";
@@ -62,12 +63,19 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const type = category && typeof params.type === "string" ? params.type : undefined;
   const sort = typeof params.sort === "string" && params.sort in SORTS ? (params.sort as keyof typeof SORTS) : "new";
   const sale = params.sale === "1";
+  // ?min= / ?max= in Toman; Persian digits and thousands separators are fine, anything else is ignored.
+  const price = (v: unknown) => {
+    const n = typeof v === "string" ? Number(toLatinDigits(v).replace(/\D/g, "")) : 0;
+    return Number.isInteger(n) && n >= 1 && n <= MAX_PRICE ? n : undefined;
+  };
+  let [min, max] = [price(params.min), price(params.max)];
+  if (min && max && min > max) [min, max] = [max, min];
   const categories = db
     .prepare("SELECT DISTINCT category FROM products WHERE active = 1 AND category != '' ORDER BY category")
     .all() as { category: string }[];
 
   const where = ["active = 1"];
-  const args: string[] = [];
+  const args: (string | number)[] = [];
   if (category) {
     where.push("category = ?");
     args.push(category);
@@ -81,6 +89,21 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     const like = likeContains(q);
     where.push("(name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR category LIKE ? ESCAPE '\\' OR subcategory LIKE ? ESCAPE '\\')");
     args.push(like, like, like, like);
+  }
+  // The slider's ends: this listing's cheapest and dearest product before the price filter, on the slider's step.
+  const range = db.prepare(`SELECT MIN(price) AS lo, MAX(price) AS hi FROM products WHERE ${where.join(" AND ")}`).get(...args) as { lo: number | null; hi: number | null };
+  const lo = Math.floor((range.lo ?? 0) / PRICE_STEP) * PRICE_STEP;
+  const hi = Math.ceil((range.hi ?? 0) / PRICE_STEP) * PRICE_STEP;
+  // A limit at (or past) an end of the slider filters nothing, so it is dropped and the plain listing stays the plain address.
+  if (min && min <= lo) min = undefined;
+  if (max && max >= hi) max = undefined;
+  if (min) {
+    where.push("price >= ?");
+    args.push(min);
+  }
+  if (max) {
+    where.push("price <= ?");
+    args.push(max);
   }
   const filter = where.join(" AND ");
   const total = (db.prepare(`SELECT COUNT(*) AS n FROM products WHERE ${filter}`).get(...args) as { n: number }).n;
@@ -99,7 +122,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   /** Link to this listing with some parameters changed, keeping the rest. */
   const link = (change: Record<string, string | number | undefined>) => {
     const next = new URLSearchParams();
-    for (const [k, v] of Object.entries({ category, type, q: q || undefined, sort: sort === "new" ? undefined : sort, sale: sale ? "1" : undefined, page: undefined, ...change }))
+    for (const [k, v] of Object.entries({ category, type, q: q || undefined, sort: sort === "new" ? undefined : sort, sale: sale ? "1" : undefined, min, max, page: undefined, ...change }))
       if (v) next.set(k, String(v));
     return next.size ? `/?${next}` : "/";
   };
@@ -136,6 +159,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         {type ? <input type="hidden" name="type" value={type} /> : null}
         {sort === "new" ? null : <input type="hidden" name="sort" value={sort} />}
         {sale ? <input type="hidden" name="sale" value="1" /> : null}
+        {min ? <input type="hidden" name="min" value={min} /> : null}
+        {max ? <input type="hidden" name="max" value={max} /> : null}
         <SearchInput defaultValue={q} />
         <button className="btn shrink-0">جستجو</button>
       </form>
@@ -188,6 +213,24 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           حراج
         </Link>
       </nav>
+      <form action="/" aria-label="فیلتر قیمت" className="mb-4 flex flex-wrap items-end gap-x-3 gap-y-1 text-sm">
+        {category ? <input type="hidden" name="category" value={category} /> : null}
+        {type ? <input type="hidden" name="type" value={type} /> : null}
+        {q ? <input type="hidden" name="q" value={q} /> : null}
+        {sort === "new" ? null : <input type="hidden" name="sort" value={sort} />}
+        {sale ? <input type="hidden" name="sale" value="1" /> : null}
+        {hi > lo ? (
+          <PriceRange key={`${lo}-${hi}-${min}-${max}`} lo={lo} hi={hi} min={min && Math.min(min, hi)} max={max && Math.max(max, lo)} />
+        ) : null}
+        <noscript>
+          <button className="btn-ghost px-3 py-1">اعمال قیمت</button>
+        </noscript>
+        {min || max ? (
+          <Link href={link({ min: undefined, max: undefined })} scroll={false} className="text-accent hover:underline">
+            حذف فیلتر قیمت
+          </Link>
+        ) : null}
+      </form>
       {q ? (
         <p className="mb-4 text-sm text-muted">
           {total.toLocaleString("fa-IR")} نتیجه برای «{q}»{" "}
