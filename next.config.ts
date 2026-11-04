@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   experimental: {
     // Product photo uploads are up to 5 MB (lib/uploads.ts); the default 1 MB would reject them. Extra room is multipart overhead.
     serverActions: { bodySizeLimit: "6mb" },
+    // A click or form sent while offline waits and retries instead of failing; app/offline-screen.tsx says why.
+    useOffline: true,
   },
   // No other site may frame the shop (clickjacking on checkout or the admin panel). No img-src rule: admins paste image URLs from any host.
   async headers() {

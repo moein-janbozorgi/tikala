@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { logout, setTheme } from "./actions";
 import { BagIcon, MenuIcon, MoonIcon, SunIcon, SystemIcon, UserIcon } from "./icons";
 import { Footer } from "./footer";
+import { OfflineScreen } from "./offline-screen";
 import { SideMenu } from "./side-menu";
 import "./globals.css";
 
@@ -104,6 +105,7 @@ export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
         <Footer categories={categories} />
         {auth}
+        <OfflineScreen />
       </body>
     </html>
   );

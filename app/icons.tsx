@@ -154,6 +154,15 @@ export const BagCheckArt = ({ className }: { className?: string }) => (
     </g>
   </svg>
 );
+/** Crossed-out wifi in the same sticker look, for the no-connection screen (public/offline.html has a copy). */
+export const WifiOffArt = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" fill="none" stroke="var(--brand-ink)" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <circle cx="50" cy="52" r="40" fill="var(--brand)" />
+    <path d="M27 46a33 33 0 0 1 46 0M35 55a21 21 0 0 1 30 0M43 64a9 9 0 0 1 14 0" />
+    <path d="M50 74h.01" strokeWidth={9} />
+    <path d="m26 28 48 48" strokeWidth={7} />
+  </svg>
+);
 /** The same bag with a question mark, for the 404 page. */
 export const BagQuestionArt = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 100 100" fill="none" stroke="var(--brand-ink)" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">

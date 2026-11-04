@@ -1,0 +1,74 @@
+<!doctype html>
+<!-- Served by public/sw.js when a page can't load offline: no site CSS or scripts, only the fonts the worker caches with it. -->
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>اتصال برقرار نیست | تیکلا</title>
+    <style>
+      /* The site's own fonts (Persian subset). */
+      @font-face {
+        font-family: Vazirmatn;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url(/fonts/vazirmatn-arabic.woff2) format("woff2");
+      }
+      @font-face {
+        font-family: Lalezar;
+        font-display: swap;
+        src: url(/fonts/lalezar-arabic.woff2) format("woff2");
+      }
+      :root {
+        color-scheme: light dark;
+        --page: light-dark(#f4f5f9, #0e1222);
+        --ink: light-dark(#141a33, #eef0f8);
+        --muted: light-dark(#586079, #9aa2bd);
+        --brand: light-dark(#ffc928, #f5c232);
+        --brand-ink: #141a33;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        box-sizing: border-box;
+        text-align: center;
+        background: var(--page);
+        color: var(--ink);
+        font-family: Vazirmatn, Tahoma, sans-serif;
+      }
+      svg { width: 144px; height: 144px; }
+      h1 { margin: 24px 0 0; font-family: Lalezar, Vazirmatn, Tahoma, sans-serif; font-size: 2rem; font-weight: 400; }
+      p { margin: 8px 0 0; max-width: 24rem; color: var(--muted); line-height: 2; }
+      button {
+        margin-top: 24px;
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 24px;
+        background: var(--brand);
+        color: var(--brand-ink);
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <svg viewBox="0 0 100 100" fill="none" stroke="#141a33" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="50" cy="52" r="40" fill="var(--brand)" />
+      <path d="M27 46a33 33 0 0 1 46 0M35 55a21 21 0 0 1 30 0M43 64a9 9 0 0 1 14 0" />
+      <path d="M50 74h.01" stroke-width="9" />
+      <path d="m26 28 48 48" stroke-width="7" />
+    </svg>
+    <h1>اتصال به اینترنت برقرار نیست</h1>
+    <p>اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.</p>
+    <button onclick="location.reload()">تلاش دوباره</button>
+    <script>
+      // Comes back by itself once the connection does.
+      addEventListener("online", () => location.reload());
+    </script>
+  </body>
+</html>
