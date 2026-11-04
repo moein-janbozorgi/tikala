@@ -164,7 +164,7 @@ const unpaidId = cb.location.match(/order=(\d+)/)[1];
 // account forms: 0 logout, 1 theme, 2 = pay button of newest (unpaid) order
 r = await submit("/account", 2, { orderId: unpaidId });
 check(r.location?.startsWith("https://sandbox.zarinpal.com/pg/StartPay/"), "retry payment goes to gateway");
-r = await submit("/admin", 2, { id: unpaidId, status: "cancelled" });
+r = await submit("/admin", 2, { id: unpaidId, status: "awaiting_payment", cancel: "1" });
 const stockAfter = await product1Stock();
 check(stockAfter === stockBefore, `admin cancel returns stock (${stockBefore} -> ${stockAfter})`);
 const staleCb = await fetch(`${base}/payment/callback?Authority=${gw.split("/").pop()}&Status=OK`, { headers: { cookie: cookieHeader() }, redirect: "manual" });

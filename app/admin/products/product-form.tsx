@@ -111,8 +111,12 @@ export function ProductForm({ product, variants = [] }: { product?: Product; var
           defaultValue={variants.map((v) => `${v.size} | ${v.color} | ${v.stock}`).join("\n")}
           placeholder={"M | مشکی | 10\nL | سفید | 5"}
           rows={5}
+          aria-describedby="variants-hint"
           className="input font-mono"
         />
+        <span id="variants-hint" className="mt-1 block text-xs leading-6 text-muted">
+          نمونه سایز — لباس: S، M، L، XL · شلوار: 30، 32، 34، 36 (دور کمر به اینچ)، مثلاً «32 | مشکی | 6» · کفش: 40، 41، 42
+        </span>
       </label>
       <label className="flex items-center gap-2">
         <input type="checkbox" name="active" defaultChecked={product ? !!product.active : true} />

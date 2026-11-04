@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { shippingCost, toman } from "./format.ts";
 import { toLatinDigits } from "./phone.ts";
-import { SAMPLE_PRODUCTS } from "./samples.ts";
+import { SAMPLE_PRODUCTS, SIZE_GUIDES } from "./samples.ts";
 
 const path = process.env.DB_PATH ?? "data/shop.db";
 if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
@@ -410,4 +410,12 @@ transaction(() => {
     saveVariants(p.id, variants);
     db.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(category);
   }
+});
+
+// v8: standard size charts for the starter categories. After the sample seed, so a fresh install's categories get them too.
+transaction(() => {
+  if (schemaVersion() >= 8) return;
+  const fill = db.prepare("UPDATE categories SET size_guide = ? WHERE name = ? AND size_guide = ''");
+  for (const [name, guide] of Object.entries(SIZE_GUIDES)) fill.run(guide, name);
+  db.exec("PRAGMA user_version = 8");
 });

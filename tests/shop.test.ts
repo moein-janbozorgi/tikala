@@ -349,3 +349,11 @@ test("CSV export quotes every cell and defuses Excel formulas", async () => {
   const { csv } = await import("../lib/csv.ts");
   assert.equal(csv([["a", 'say "hi"', null], ["=HYPERLINK(\"x\")", "-1", "09121234567"]]), '"a","say ""hi""",""\r\n"\'=HYPERLINK(""x"")","\'-1","09121234567"');
 });
+
+test("every starter category gets a size guide listing each size its products use", () => {
+  for (const c of db.prepare("SELECT name, size_guide FROM categories").all() as { name: string; size_guide: string }[]) {
+    const listed = new Set(c.size_guide.split("\n").map((l) => l.split("|")[0].trim()));
+    const used = db.prepare("SELECT DISTINCT v.size FROM variants v JOIN products p ON p.id = v.product_id WHERE p.category = ?").all(c.name) as { size: string }[];
+    for (const { size } of used) assert.ok(listed.has(size), `${c.name}: size ${size} missing from its guide`);
+  }
+});

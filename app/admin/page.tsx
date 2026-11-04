@@ -120,35 +120,34 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
                   maxLength={30}
                   className="input w-56 py-1.5 text-sm"
                 />
-                {/* The form's first button, so Enter in the code field saves it without moving the order to another step. */}
-                <button name="status" value={o.status} className="btn-ghost px-3 py-1.5 text-xs">
-                  ذخیره کد
-                </button>
                 <span className="text-xs text-muted">پیش از «ارسال شده» وارد کنید تا در پیامک مشتری بیاید.</span>
               </div>
             )}
             {o.status === "cancelled" ? null : (
-              <ol aria-label="مراحل سفارش" className="flex flex-wrap items-center gap-1">
-                {/* Only checkout sets "awaiting payment"; it is shown just for orders that are in it. */}
-                {(o.status === "awaiting_payment" ? ["awaiting_payment", ...STEPS] : STEPS).map((s, i, steps) => {
-                  const at = steps.indexOf(o.status);
-                  return (
-                    <li key={s} className="flex items-center gap-1">
-                      {i > 0 ? <span aria-hidden className={`h-0.5 w-3 rounded-full ${i <= at ? "bg-ink" : "bg-line"}`} /> : null}
-                      <button
-                        name="status"
-                        value={s}
-                        disabled={i === at}
-                        aria-current={i === at ? "step" : undefined}
-                        className={`chip gap-1 px-3 py-1.5 text-xs disabled:cursor-default ${i === at ? "chip-active" : i < at ? `badge tone-${s} border-transparent` : "text-muted"}`}
-                      >
-                        {i < at ? <span aria-hidden>✓</span> : null}
-                        {ORDER_STATUSES[s]}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ol>
+              <fieldset className="flex flex-wrap items-center gap-2">
+                <legend className="sr-only">مرحله سفارش {o.id.toLocaleString("fa-IR")}</legend>
+                <ol className="flex flex-wrap items-center gap-1">
+                  {/* Only checkout sets "awaiting payment"; it is shown just for orders that are in it. */}
+                  {(o.status === "awaiting_payment" ? ["awaiting_payment", ...STEPS] : STEPS).map((s, i, steps) => {
+                    const at = steps.indexOf(o.status);
+                    return (
+                      <li key={s} className="flex items-center gap-1">
+                        {i > 0 ? <span aria-hidden className={`h-0.5 w-3 rounded-full ${i <= at ? "bg-ink" : "bg-line"}`} /> : null}
+                        {/* Picking a step only selects it; «اعمال تغییرات» saves it. */}
+                        <label
+                          className={`chip cursor-pointer gap-1 px-3 py-1.5 text-xs has-checked:chip-active has-focus-visible:outline-2 has-focus-visible:outline-ink ${i < at ? `badge tone-${s} border-transparent` : i > at ? "text-muted" : ""}`}
+                        >
+                          <input type="radio" name="status" value={s} defaultChecked={i === at} className="sr-only" />
+                          {i < at ? <span aria-hidden>✓</span> : null}
+                          {ORDER_STATUSES[s]}
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ol>
+                {/* The form's first button, so Enter in the tracking code field applies too. */}
+                <button className="btn px-4 py-1.5 text-xs">اعمال تغییرات</button>
+              </fieldset>
             )}
             <div className="ms-auto flex gap-2">
               <Link href={`/admin/orders/${o.id}/invoice`} target="_blank" className="btn-ghost px-3 py-1.5 text-xs">
@@ -156,8 +155,8 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
               </Link>
               {o.status === "cancelled" ? null : (
                 <ConfirmButton
-                  name="status"
-                  value="cancelled"
+                  name="cancel"
+                  value="1"
                   message={`سفارش #${o.id.toLocaleString("fa-IR")} لغو شود؟ اقلام به انبار برمی‌گردند و لغو قابل بازگشت نیست.`}
                   className="btn-ghost px-3 py-1.5 text-xs"
                 >

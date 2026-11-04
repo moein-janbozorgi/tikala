@@ -127,7 +127,8 @@ export async function deleteCategory(form: FormData) {
 
 export async function setOrderStatus(form: FormData) {
   await requireAdmin();
-  const status = String(form.get("status"));
+  // The cancel button has its own name: the selected status radio is always sent along with it.
+  const status = form.has("cancel") ? "cancelled" : String(form.get("status"));
   const id = Number(form.get("id"));
   // Back to the same filtered list the admin was looking at.
   const back = String(form.get("back") ?? "");
