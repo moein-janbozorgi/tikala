@@ -12,7 +12,7 @@ import { PROVINCES } from "@/lib/format";
 import { clearLoginFailures, hashPassword, loginLocked, passwordProblem, recordLoginFailure, verifyPassword } from "@/lib/password";
 import { checkCode, consumeCode, createCode, smsAllowedForIp } from "@/lib/otp";
 import { notifyOrder, sendLoginCode } from "@/lib/sms";
-import { emailProblem, errorParam, nameProblem, accountNameProblem, normalizePhone, normalizePostalCode, safeNext, toLatinDigits } from "@/lib/validation";
+import { emailProblem, errorParam, nameProblem, normalizePhone, normalizePostalCode, safeNext, toLatinDigits } from "@/lib/validation";
 
 const str = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
 const fail = (path: string, message: string, key = "error"): never =>
@@ -124,7 +124,7 @@ export async function register(form: FormData) {
   // Name and email come back after an error; passwords never do.
   const reject = (message: string) =>
     failWithValues(back, message, "register", { name: str(form, "name").slice(0, 50), email: str(form, "email").slice(0, 254) }, "auth_error");
-  const problem = accountNameProblem(name) ?? emailProblem(email) ?? passwordProblem(password, String(form.get("confirm") ?? ""));
+  const problem = nameProblem(name) ?? emailProblem(email) ?? passwordProblem(password, String(form.get("confirm") ?? ""));
   if (problem) await reject(problem);
   // "Already registered" tells whether an email has an account, so trying taken emails counts like a failed login:
   // one IP can't check more than a handful of emails.
@@ -227,7 +227,7 @@ export async function verifyCode(form: FormData) {
   if (!user) {
     // New number: the code was right, but it stays valid until the name is fixed, so a typo doesn't cost a new SMS.
     const name = str(form, "name").replace(/\s+/g, " ");
-    const nameError = accountNameProblem(name);
+    const nameError = nameProblem(name);
     if (nameError) authFail(back, `برای ساخت حساب جدید نام را وارد کنید: ${nameError}`);
     user = db.prepare("INSERT INTO users (name, phone) VALUES (?, ?) ON CONFLICT (phone) DO UPDATE SET phone = phone RETURNING id").get(name, phone) as { id: number };
   }

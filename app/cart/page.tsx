@@ -118,7 +118,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
           <ValidatedForm action={checkout} className="space-y-4 border-t border-line pt-5">
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium">نام گیرنده</span>
-              <input name="name" defaultValue={typed.name ?? user.name} required maxLength={50} pattern={NAME_PATTERN} title={NAME_RULE} autoComplete="name" className="input" />
+              <input name="name" defaultValue={typed.name ?? user.name} required maxLength={30} pattern={NAME_PATTERN} title={NAME_RULE} autoComplete="name" className="input" />
               <FieldError name="name" label="نام گیرنده" />
             </label>
             <label className="block">

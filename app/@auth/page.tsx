@@ -6,7 +6,7 @@ import { normalizePhone, safeNext } from "@/lib/validation";
 import { login, register, requestCode, verifyCode } from "../actions";
 import { ErrorMessage } from "../error-message";
 import { CloseIcon } from "../icons";
-import { ACCOUNT_NAME_PATTERN, ACCOUNT_NAME_RULE, EMAIL_PATTERN } from "@/lib/rules";
+import { NAME_PATTERN, NAME_RULE, EMAIL_PATTERN } from "@/lib/rules";
 import { FieldError, ValidatedForm } from "../validated-form";
 import { CloseOnEscape } from "./close-on-escape";
 import { ResendButton } from "./resend-button";
@@ -125,9 +125,9 @@ async function Register({ hidden, error, loginHref }: ViewProps) {
           autoComplete="name"
           required
           maxLength={30}
-          // Same rules as accountNameProblem() / emailProblem() on the server; `title` is the message shown when they fail.
-          pattern={ACCOUNT_NAME_PATTERN}
-          title={ACCOUNT_NAME_RULE}
+          // Same rules as nameProblem() / emailProblem() on the server; `title` is the message shown when they fail.
+          pattern={NAME_PATTERN}
+          title={NAME_RULE}
           className="input"
         />
         <FieldError name="name" label="نام و نام خانوادگی" />
@@ -233,7 +233,7 @@ function Verify({ hidden, error, phone, purpose, loginHref }: ViewProps & { phon
         {purpose === "login" ? (
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium">نام و نام خانوادگی (فقط برای حساب جدید)</span>
-            <input name="name" autoComplete="name" maxLength={30} pattern={ACCOUNT_NAME_PATTERN} title={ACCOUNT_NAME_RULE} className="input" />
+            <input name="name" autoComplete="name" maxLength={30} pattern={NAME_PATTERN} title={NAME_RULE} className="input" />
             <FieldError name="name" label="نام و نام خانوادگی" />
             <span className="mt-1.5 block text-xs text-muted">
               اگر قبلاً با ایمیل ثبت‌نام کرده‌اید، ابتدا با ایمیل وارد شوید و شماره را در حساب کاربری اضافه کنید تا دو حساب جدا ساخته نشود.

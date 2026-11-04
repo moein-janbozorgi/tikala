@@ -97,6 +97,8 @@ check((await get("/cart")).html.includes("ثبت سفارش"), "cart shows check
 // cart page forms: 0 logout, 1 theme, 2 update, 3 remove, 4 checkout
 r = await submitForm("/cart", 'name="postal_code"', { name: "تست", phone: "123", address: "x" });
 check(r.location?.includes("error="), "bad phone rejected");
+r = await submitForm("/cart", 'name="postal_code"', { name: "ابوالفضل محمدی‌نژاد", phone: "09121234567", province: "تهران", city: "تهران", postal_code: "1234567890", address: "تهران، خیابان آزادی", payment: "cod" });
+check(decodeURIComponent(r.location ?? "").includes("۳ تا ۱۵ حرف"), "checkout name over 15 letters rejected");
 r = await submitForm("/cart", 'name="postal_code"', { name: "تست", phone: "09121234567", province: "تهران", city: "تهران", postal_code: "1234567890", address: "تهران، خیابان آزادی", payment: "cod" });
 check(r.location?.startsWith("/account?order="), "checkout creates order");
 const account = (await get("/account")).html;
