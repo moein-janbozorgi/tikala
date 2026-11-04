@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import { ChevronDownIcon } from "./icons";
 import { FieldError, useRecheck } from "./validated-form";
 
 /** Text input with a filtered suggestion list. `hint` explains a value that is not one of the options. */
@@ -86,9 +87,7 @@ export function Combobox({
           }}
           className="input pe-9"
         />
-        <svg aria-hidden viewBox="0 0 20 20" fill="currentColor" className={`pointer-events-none absolute inset-e-3 top-1/2 size-4 -translate-y-1/2 text-muted transition ${show ? "rotate-180" : ""}`}>
-          <path d="M5.2 7.2a.75.75 0 0 1 1.06 0L10 10.94l3.74-3.74a.75.75 0 1 1 1.06 1.06l-4.27 4.27a.75.75 0 0 1-1.06 0L5.2 8.26a.75.75 0 0 1 0-1.06Z" />
-        </svg>
+        <ChevronDownIcon className={`pointer-events-none absolute inset-e-3 top-1/2 size-4 -translate-y-1/2 text-muted transition ${show ? "rotate-180" : ""}`} />
         {show ? (
           <ul id={`${id}-list`} role="listbox" className="absolute inset-x-0 top-full z-20 mt-1.5 max-h-60 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-lg">
             {options.map((t, i) => (

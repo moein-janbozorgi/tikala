@@ -66,11 +66,56 @@ body {
   .input[aria-invalid="true"] {
     @apply border-danger focus:border-danger focus:ring-danger/25;
   }
+  /* Use with .input inside a relative wrapper that also holds a ChevronDownIcon (app/icons.tsx), like the combobox. */
+  .select {
+    @apply cursor-pointer appearance-none pe-10;
+  }
   .card {
     @apply rounded-2xl border border-line bg-surface p-5;
   }
   .chip {
     @apply inline-flex cursor-pointer items-center rounded-full border border-line bg-surface px-4 py-1.5 text-sm transition hover:border-ink;
+  }
+}
+
+/* Browsers with customizable <select> also get the option list in the shop's style, like the combobox list; others keep
+   their own list. Still a plain <select>, so it works without JavaScript. */
+@supports (appearance: base-select) {
+  .select,
+  .select::picker(select) {
+    appearance: base-select;
+  }
+  .select::picker-icon {
+    display: none; /* the wrapper draws the chevron */
+  }
+  .select::picker(select) {
+    margin-block: 0.375rem;
+    min-width: anchor-size(width);
+    max-height: 15rem;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    background: var(--surface);
+    padding: 0.25rem;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  }
+  .select option {
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  .select option:hover,
+  .select option:focus-visible {
+    background: var(--surface-2);
+    outline: none;
+  }
+  .select option:checked {
+    font-weight: 700;
+  }
+  .select option::checkmark {
+    order: 1; /* after the text, like the combobox's ✓ */
+    margin-inline-start: auto;
+    color: var(--accent);
   }
 }
 

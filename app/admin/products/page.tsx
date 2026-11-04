@@ -7,6 +7,7 @@ import { ErrorMessage } from "../../error-message";
 import { ProductImage } from "../../product-image";
 import { deleteProduct } from "../actions";
 import { ConfirmButton } from "../confirm-button";
+import { ChevronDownIcon } from "../../icons";
 
 export default async function AdminProductsPage({ searchParams }: PageProps<"/admin/products">) {
   await requireAdmin();
@@ -47,12 +48,15 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
 
       <form action="/admin/products" role="search" className="flex flex-wrap gap-2">
         <input type="search" name="q" defaultValue={q} placeholder="جستجوی نام محصول…" aria-label="جستجوی محصول" className="input min-w-48 flex-1" />
-        <select name="category" defaultValue={category} aria-label="دسته‌بندی" className="input w-auto">
-          <option value="">همه دسته‌بندی‌ها</option>
-          {categories.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
+        <span className="relative">
+          <select name="category" defaultValue={category} aria-label="دسته‌بندی" className="input select w-auto min-w-44">
+            <option value="">همه دسته‌بندی‌ها</option>
+            {categories.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+          <ChevronDownIcon className="pointer-events-none absolute inset-e-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+        </span>
         <button className="btn-ghost">فیلتر</button>
       </form>
 
