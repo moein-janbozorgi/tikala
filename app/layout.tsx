@@ -107,7 +107,7 @@ export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
           </nav>
         </header>
         <SideMenu categories={categories} />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:py-8">{children}</main>
         <Footer categories={categories} />
         {auth}
         <OfflineScreen />

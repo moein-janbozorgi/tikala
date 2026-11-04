@@ -118,7 +118,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
                   aria-label={`کد رهگیری مرسوله سفارش ${o.id}`}
                   dir="ltr"
                   maxLength={30}
-                  className="input w-56 py-1.5 text-sm"
+                  className="input w-56 py-1.5 text-base sm:text-sm"
                 />
                 <span className="text-xs text-muted">پیش از «ارسال شده» وارد کنید تا در پیامک مشتری بیاید.</span>
               </div>

@@ -139,7 +139,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
               dir="ltr"
               maxLength={20}
               autoComplete="off"
-              className="input py-2 text-sm uppercase"
+              className="input py-2 text-base uppercase sm:text-sm"
             />
             <button className="btn-ghost shrink-0">اعمال</button>
             {coupon ? (

@@ -86,7 +86,7 @@ export default async function AdminCategoriesPage({ searchParams }: PageProps<"/
                   maxLength={2000}
                   aria-label={`راهنمای سایز ${c.name}`}
                   placeholder={"سایز | دور سینه | قد\nS | ۹۶ | ۶۸\nM | ۱۰۰ | ۷۰\nاندازه‌ها به سانتی‌متر است."}
-                  className="input font-mono text-sm"
+                  className="input font-mono text-base sm:text-sm"
                 />
                 <p className="text-xs text-muted">هر خط یک ردیف جدول، ستون‌ها با «|» جدا شوند؛ خط اول عنوان ستون‌هاست. خط بدون «|» زیر جدول به‌عنوان توضیح نمایش داده می‌شود.</p>
                 <button className="btn-ghost px-3 py-1.5 text-sm">ذخیره راهنمای سایز</button>

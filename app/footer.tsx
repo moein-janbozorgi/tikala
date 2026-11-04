@@ -46,16 +46,16 @@ export function Footer({ categories }: { categories: { category: string }[] }) {
           </a>
         </div>
 
-        <ul className="mt-10 grid gap-6 sm:grid-cols-3">
+        <ul className="mt-8 grid grid-cols-3 gap-3 sm:mt-10 sm:gap-6">
           {FEATURES.map((f) => (
-            <li key={f.label} className="flex flex-col items-center gap-3 text-center text-sm text-muted">
-              <span className="grid size-14 place-items-center rounded-full bg-surface-2 text-ink [&>svg]:size-7">{f.icon}</span>
+            <li key={f.label} className="flex flex-col items-center gap-2 text-center text-xs text-muted sm:gap-3 sm:text-sm">
+              <span className="grid size-11 place-items-center rounded-full bg-surface-2 text-ink sm:size-14 [&>svg]:size-6 sm:[&>svg]:size-7">{f.icon}</span>
               {f.label}
             </li>
           ))}
         </ul>
 
-        <div className="mt-10 grid gap-8 border-t border-line pt-10 sm:grid-cols-3">
+        <div className="mt-8 grid grid-cols-2 gap-8 border-t border-line pt-8 sm:mt-10 sm:grid-cols-3 sm:pt-10">
           <nav aria-label="دسترسی سریع">
             <p className="font-bold">دسترسی سریع</p>
             <ul className="mt-4 space-y-3 text-sm text-muted">
@@ -76,7 +76,7 @@ export function Footer({ categories }: { categories: { category: string }[] }) {
             </ul>
           </nav>
           {CONTACT.length || SOCIAL.length ? (
-            <nav aria-label="تماس با ما">
+            <nav aria-label="تماس با ما" className="col-span-2 sm:col-span-1">
               <p className="font-bold">تماس با ما</p>
               {CONTACT.length ? (
                 <ul className="mt-4 space-y-3 text-sm text-muted">

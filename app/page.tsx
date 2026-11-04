@@ -131,15 +131,16 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     <>
       <ErrorMessage error={typeof params.error === "string" ? params.error : undefined} />
       {category || q ? null : (
-        <section className="mb-10 flex flex-col-reverse items-start justify-between gap-6 sm:flex-row sm:items-center rounded-3xl bg-brand px-6 py-12 text-brand-ink sm:px-12 sm:py-16">
+        <section className="mb-6 flex flex-col-reverse items-start justify-between gap-6 rounded-3xl bg-brand px-5 py-7 text-brand-ink sm:mb-10 sm:flex-row sm:items-center sm:px-12 sm:py-16">
           <div>
-            <p className="mb-4 inline-block rounded-full bg-brand-ink px-3 py-1 text-xs font-bold text-brand">بوتیک آنلاین تیکلا</p>
-            <h1 className="max-w-lg font-display text-4xl leading-tight sm:text-6xl sm:leading-tight">استایل هر روزت را این‌جا پیدا کن</h1>
-            <p className="mt-4 max-w-lg leading-8 text-brand-ink/80">
+            <p className="mb-3 inline-block rounded-full bg-brand-ink px-3 py-1 text-xs font-bold text-brand sm:mb-4">بوتیک آنلاین تیکلا</p>
+            <h1 className="max-w-lg font-display text-3xl leading-tight text-balance sm:text-6xl sm:leading-tight">استایل هر روزت را این‌جا پیدا کن</h1>
+            {/* On phones the banner stays short so products show sooner; the features are in the footer too. */}
+            <p className="mt-4 hidden max-w-lg leading-8 text-brand-ink/80 sm:block">
               از تی‌شرت و پیراهن تا شلوار، هودی، بافت و کفش؛ لباس‌های مد روز را با سایز و رنگ دلخواهت انتخاب کن، آنلاین یا هنگام تحویل
               پرداخت کن و سفارشت را درِ خانه تحویل بگیر.
             </p>
-            <ul className="mt-6 flex flex-wrap gap-2 text-xs font-medium sm:text-sm">
+            <ul className="mt-6 hidden flex-wrap gap-2 text-xs font-medium sm:flex sm:text-sm">
               {FEATURES.map((f) => (
                 <li key={f.label} className="flex items-center gap-1.5 rounded-full bg-white/60 px-3 py-1.5">
                   {f.icon}
@@ -148,7 +149,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               ))}
             </ul>
           </div>
-          <div className="grid size-20 shrink-0 place-items-center rounded-full bg-white p-3 shadow-lg shadow-brand-ink/10 sm:size-44 sm:p-7">
+          <div className="hidden size-20 shrink-0 place-items-center rounded-full bg-white p-3 shadow-lg shadow-brand-ink/10 sm:grid sm:size-44 sm:p-7">
             <BagCheckArt className="size-full" />
           </div>
         </section>
@@ -295,7 +296,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                         <label
                           key={v.id}
                           title={`موجودی: ${v.stock.toLocaleString("fa-IR")}`}
-                          className="chip px-2.5 py-1 text-xs has-checked:chip-active has-focus-visible:ring-2 has-focus-visible:ring-accent"
+                          className="chip min-h-8 px-2.5 py-1 text-xs has-checked:chip-active has-focus-visible:ring-2 has-focus-visible:ring-accent"
                         >
                           <input type="radio" name="variantId" value={v.id} defaultChecked={i === 0} required className="sr-only" />
                           {v.size} · {v.color}
