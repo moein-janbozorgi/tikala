@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db, type Product, type Variant } from "@/lib/db";
-import { toman } from "@/lib/format";
+import { SITE_URL, toman } from "@/lib/format";
 import { addToCart } from "../../actions";
 import { ErrorMessage } from "../../error-message";
 import { ProductImage } from "../../product-image";
@@ -30,9 +30,29 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
   if (!product) notFound();
   const variants = db.prepare("SELECT * FROM variants WHERE product_id = ? ORDER BY id").all(product.id) as Variant[];
   const firstInStock = variants.find((v) => v.stock > 0);
+  // Structured data, so Google can show the price and stock right in search results. Schema.org needs an ISO currency,
+  // and the toman isn't one, so the price goes in rial (×10).
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description || undefined,
+    image: product.image ? new URL(product.image, SITE_URL).href : undefined,
+    sku: String(product.id),
+    category: product.category || undefined,
+    offers: {
+      "@type": "Offer",
+      url: `${SITE_URL}/product/${product.id}`,
+      price: product.price * 10,
+      priceCurrency: "IRR",
+      availability: firstInStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    },
+  };
 
   return (
     <>
+      {/* "<" escaped so text in a product name or description can't close the script tag. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <nav className="mb-6 flex gap-2 text-sm text-muted" aria-label="مسیر">
         <Link href="/" className="hover:text-ink">
           خانه

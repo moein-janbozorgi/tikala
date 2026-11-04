@@ -226,6 +226,14 @@ const sitemap = await get("/sitemap.xml");
 check(sitemap.status === 200 && sitemap.html.includes("/product/1</loc>") && !sitemap.html.includes("/admin"), "sitemap lists products");
 check((await get("/robots.txt")).html.includes("Disallow: /admin") && (await get("/robots.txt")).html.includes("sitemap.xml"), "robots.txt hides private pages and points to the sitemap");
 
+const ld = JSON.parse((await get("/product/1")).html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)?.[1] ?? "null");
+const product1Price = new DatabaseSync(process.env.DB_PATH).prepare("SELECT price FROM products WHERE id = 1").get().price;
+check(ld?.["@type"] === "Product" && ld.offers.price === product1Price * 10 && ld.offers.priceCurrency === "IRR" && ld.offers.availability.endsWith("InStock") && ld.image.startsWith("http"), "product page has Product structured data (price in rial, stock, absolute image)");
+const canonicalOf = (html) => html.match(/<link rel="canonical" href="([^"]+)"/)?.[1];
+const shoes = (await get("/?category=" + encodeURIComponent("کفش") + "&sort=cheap&page=2")).html;
+check(shoes.includes("<title>کفش | تیکلا</title>") && decodeURIComponent(canonicalOf(shoes) ?? "").endsWith("/?category=کفش"), "category page has its own title; sorted/paged versions point to it as canonical");
+check(/<meta name="robots" content="noindex, follow"/.test((await get("/?q=" + encodeURIComponent("هودی"))).html) && !/name="robots"/.test(shoes), "search results are noindex, category pages are indexable");
+
 // Sorting: the cheapest product on sale comes first.
 const { DatabaseSync: Db } = await import("node:sqlite");
 const cheapest = new Db(process.env.DB_PATH).prepare("SELECT id FROM products WHERE active = 1 ORDER BY price, id DESC LIMIT 1").get().id;

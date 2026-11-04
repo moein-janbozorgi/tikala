@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { db, type Product, type Variant } from "@/lib/db";
 import { likeContains } from "@/lib/validation";
@@ -32,6 +33,24 @@ const SORTS = {
   cheap: ["ارزان‌ترین", "price ASC, id DESC"],
   expensive: ["گران‌ترین", "price DESC, id DESC"],
 } as const;
+
+/**
+ * Each category (and type) gets its own title and description, so it can rank for searches like «خرید کفش». The
+ * canonical address keeps only category and type: sorted and "load more" versions are the same page to Google, and
+ * search results are not indexed.
+ */
+export async function generateMetadata({ searchParams }: PageProps<"/">): Promise<Metadata> {
+  const params = await searchParams;
+  const category = typeof params.category === "string" ? params.category : undefined;
+  const type = category && typeof params.type === "string" ? params.type : undefined;
+  const canonical = category ? `/?${new URLSearchParams(type ? { category, type } : { category })}` : "/";
+  const exists = !category || db.prepare("SELECT 1 FROM products WHERE active = 1 AND category = ? AND (? IS NULL OR subcategory = ?)").get(category, type ?? null, type ?? null);
+  const robots = typeof params.q === "string" || !exists ? { index: false, follow: true } : undefined;
+  if (!category) return { alternates: { canonical }, robots };
+  const name = type ? `${type} (${category})` : category;
+  const description = `خرید ${type ?? category} مد روز از بوتیک تیکلا با انتخاب سایز و رنگ، پرداخت آنلاین یا هنگام تحویل و ارسال به سراسر ایران.`;
+  return { title: name, description, alternates: { canonical }, robots, openGraph: { title: name, description, siteName: "تیکلا", locale: "fa_IR", url: canonical } };
+}
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
