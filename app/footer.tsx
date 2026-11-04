@@ -2,10 +2,19 @@ import Link from "next/link";
 import { FREE_SHIPPING_FROM, toman } from "@/lib/format";
 import { CardIcon, CashIcon, ChevronUpIcon, InstagramIcon, TelegramIcon, TruckIcon } from "./icons";
 
-// Fill these in; an empty value hides its item.
-const PHONE = "";
+// Fill these in; an empty value hides its item, and the «تماس با ما» column shows once any of them is set.
+const PHONE = "06623237174";
+const EMAIL = "tikala@gmail.com"
+const ADDRESS = "خیابان انقلاب_بازار رضا_ طبقه همکف پلاک ۱۰۸"
+const HOURS = "شنبه تا پنجشنبه، ۹ تا ۱۸"
+const CONTACT = [
+  { label: "تلفن پشتیبانی", value: PHONE, href: `tel:${PHONE.replace(/[^\d+]/g, "")}` },
+  { label: "ایمیل", value: EMAIL, href: `mailto:${EMAIL}` },
+  { label: "آدرس", value: ADDRESS },
+  { label: "ساعات پاسخگویی", value: HOURS },
+].filter((c) => c.value);
 const SOCIAL = [
-  { label: "اینستاگرام", href: "", icon: <InstagramIcon /> },
+  { label: "اینستاگرام", href: "https://www.instagram.com/tikla_boutique/", icon: <InstagramIcon /> },
   { label: "تلگرام", href: "", icon: <TelegramIcon /> },
 ].filter((s) => s.href);
 
@@ -28,12 +37,6 @@ export function Footer({ categories }: { categories: { category: string }[] }) {
             </Link>
             <p className="mt-2 text-sm text-muted">
               بوتیک تیکلا، عرضه کننده انواع لباس و شلوار مد روز
-              {PHONE ? (
-                <>
-                  <span className="mx-2">|</span>
-                  تلفن پشتیبانی: <a href={`tel:${PHONE}`} dir="ltr" className="hover:text-ink">{PHONE}</a>
-                </>
-              ) : null}
             </p>
           </div>
           {/* href="#" scrolls to the top without any script. */}
@@ -72,19 +75,37 @@ export function Footer({ categories }: { categories: { category: string }[] }) {
               ))}
             </ul>
           </nav>
-          {SOCIAL.length ? (
-            <div>
-              <p className="font-bold">همراه ما باشید!</p>
-              <ul className="mt-4 flex gap-2">
-                {SOCIAL.map((s) => (
-                  <li key={s.label}>
-                    <a href={s.href} target="_blank" rel="noopener noreferrer" className="icon-btn [&>svg]:size-6" aria-label={s.label} title={s.label}>
-                      {s.icon}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {CONTACT.length || SOCIAL.length ? (
+            <nav aria-label="تماس با ما">
+              <p className="font-bold">تماس با ما</p>
+              {CONTACT.length ? (
+                <ul className="mt-4 space-y-3 text-sm text-muted">
+                  {CONTACT.map((c) => (
+                    <li key={c.label}>
+                      {c.label}:{" "}
+                      {c.href ? (
+                        <a href={c.href} dir="ltr" className="hover:text-ink">
+                          {c.value}
+                        </a>
+                      ) : (
+                        c.value
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {SOCIAL.length ? (
+                <ul aria-label="همراه ما باشید" className="mt-4 flex gap-2">
+                  {SOCIAL.map((s) => (
+                    <li key={s.label}>
+                      <a href={s.href} target="_blank" rel="noopener noreferrer" className="icon-btn size-12 bg-surface-2 [&>svg]:size-8" aria-label={s.label} title={s.label}>
+                        {s.icon}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </nav>
           ) : null}
         </div>
       </div>
