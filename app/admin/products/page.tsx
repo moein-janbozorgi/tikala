@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db, type Product } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { toman } from "@/lib/format";
+import { likeContains } from "@/lib/validation";
 import { ErrorMessage } from "../../error-message";
 import { ProductImage } from "../../product-image";
 import { deleteProduct } from "../actions";
@@ -21,8 +22,8 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
     args.push(category);
   }
   if (q) {
-    where.push("p.name LIKE ?");
-    args.push(`%${q}%`);
+    where.push("p.name LIKE ? ESCAPE '\\'");
+    args.push(likeContains(q));
   }
   const products = db
     .prepare(

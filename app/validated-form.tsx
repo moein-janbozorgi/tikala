@@ -9,14 +9,16 @@ type Errors = Record<string, true | string>;
 const Ctx = createContext<{ errors: Errors; recheck: (name: string) => void }>({ errors: {}, recheck: () => {} });
 
 // data-check="<name>": a rule shared with the server, which the HTML attributes can't express.
-const CHECKS: Record<string, (value: string) => string | undefined> = {
-  phone: (v) => (normalizePhone(v) ? undefined : "شماره موبایل معتبر نیست (مثال: 09121234567)"),
+const CHECKS: Record<string, (el: Field) => string | undefined> = {
+  phone: (el) => (!el.value || normalizePhone(el.value) ? undefined : "شماره موبایل معتبر نیست (مثال: 09121234567)"),
+  // Same 5 MB as MAX_UPLOAD_BYTES (lib/uploads.ts, server-only). Bigger files would otherwise hit the request size limit.
+  image: (el) => (((el as HTMLInputElement).files?.[0]?.size ?? 0) > 5 * 1024 * 1024 ? "حجم تصویر باید حداکثر ۵ مگابایت باشد" : undefined),
 };
 
 function problem(el: Field): true | string | undefined {
   const v = el.validity;
   if (v.valueMissing) return true;
-  const custom = el.dataset.check && CHECKS[el.dataset.check]?.(el.value);
+  const custom = el.dataset.check && CHECKS[el.dataset.check]?.(el);
   if (custom) return custom;
   // data-match="password": this field must repeat that one (a password confirmation).
   const other = el.dataset.match && el.form?.elements.namedItem(el.dataset.match);
@@ -25,6 +27,8 @@ function problem(el: Field): true | string | undefined {
   // A field's `title` states its rule, so it beats the generic messages below.
   if (el.title) return el.title;
   if (v.tooShort && "minLength" in el) return `حداقل ${el.minLength.toLocaleString("fa-IR")} حرف وارد کنید.`;
+  if (v.rangeUnderflow || v.rangeOverflow || v.stepMismatch) return `عددی صحیح بین ${Number((el as HTMLInputElement).min).toLocaleString("fa-IR")} تا ${Number((el as HTMLInputElement).max).toLocaleString("fa-IR")} وارد کنید.`;
+  if (v.badInput) return "فقط عدد وارد کنید.";
   if (v.typeMismatch && el.type === "email") return "ایمیل معتبر وارد کنید، مثال: name@example.com";
   return "مقدار واردشده درست نیست.";
 }

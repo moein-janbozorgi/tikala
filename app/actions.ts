@@ -25,7 +25,7 @@ const authFail = (path: string, message: string) => fail(path, message, "auth_er
 export async function addToCart(form: FormData) {
   const variantId = Number(form.get("variantId"));
   const qty = Math.max(1, Math.floor(Number(form.get("qty"))) || 1);
-  const variant = db.prepare("SELECT product_id, stock FROM variants WHERE id = ?").get(variantId) as
+  const variant = db.prepare("SELECT v.product_id, v.stock FROM variants v JOIN products p ON p.id = v.product_id WHERE v.id = ? AND p.active = 1").get(variantId) as
     | { product_id: number; stock: number }
     | undefined;
   if (!variant) fail("/", "این کالا پیدا نشد");
@@ -38,7 +38,9 @@ export async function addToCart(form: FormData) {
 
 export async function updateCartItem(form: FormData) {
   const variantId = String(Number(form.get("variantId")));
-  const qty = Math.floor(Number(form.get("qty"))) || 0;
+  // Never more than is in stock, and only real variants: anything else would just grow the cart cookie.
+  const stock = (db.prepare("SELECT stock FROM variants WHERE id = ?").get(Number(variantId)) as { stock: number } | undefined)?.stock ?? 0;
+  const qty = Math.min(stock, Math.floor(Number(form.get("qty"))) || 0);
   const cart = await getCart();
   if (qty > 0) cart[variantId] = qty;
   else delete cart[variantId];
@@ -59,7 +61,9 @@ async function failWithValues(path: string, message: string, form: string, value
 export async function checkout(form: FormData) {
   const user = await requireUser("/cart");
   const typed = Object.fromEntries(["name", "phone", "province", "city", "postal_code", "address", "payment"].map((k) => [k, str(form, k)]));
-  const reject = (message: string) => failWithValues("/cart", message, "checkout", typed);
+  // The refill copy is cut to the longest valid value, so a huge field can't overflow the 4 KB flash cookie.
+  const reject = (message: string) =>
+    failWithValues("/cart", message, "checkout", Object.fromEntries(Object.entries(typed).map(([k, v]) => [k, v.slice(0, 300)])));
   const phone = normalizePhone(typed.phone);
   const postalCode = normalizePostalCode(typed.postal_code);
   const nameError = nameProblem(typed.name.replace(/\s+/g, " "));
@@ -119,7 +123,7 @@ export async function register(form: FormData) {
   const password = String(form.get("password") ?? "");
   // Name and email come back after an error; passwords never do.
   const reject = (message: string) =>
-    failWithValues(back, message, "register", { name: str(form, "name"), email: str(form, "email") }, "auth_error");
+    failWithValues(back, message, "register", { name: str(form, "name").slice(0, 50), email: str(form, "email").slice(0, 254) }, "auth_error");
   const problem = nameProblem(name) ?? emailProblem(email) ?? passwordProblem(password, String(form.get("confirm") ?? ""));
   if (problem) await reject(problem);
   // "Already registered" tells whether an email has an account, so trying taken emails counts like a failed login:
@@ -148,7 +152,10 @@ export async function login(form: FormData) {
   await refuseIfSignedIn();
   const next = safeNext(form.get("next"));
   const back = authUrl(safeNext(form.get("from")), { auth: "login", next });
-  const email = str(form, "email").toLowerCase();
+  // No account has a longer email or password (register and setPassword enforce it), and the cut keeps a multi-MB
+  // value from being hashed or kept as a lockout key.
+  const email = str(form, "email").toLowerCase().slice(0, 255);
+  const password = String(form.get("password") ?? "");
   // Checked before the password, and unknown emails count too, so the lock reveals nothing about which accounts exist.
   const ip = await clientIp();
   if (loginLocked(email, ip)) authFail(back, LOCKED);
@@ -156,7 +163,7 @@ export async function login(form: FormData) {
     | { id: number; password_hash: string | null }
     | undefined;
   // Accounts created by phone have no password until the owner sets one in their account page.
-  if (!user?.password_hash || !(await verifyPassword(String(form.get("password") ?? ""), user.password_hash))) {
+  if (!user?.password_hash || password.length > 64 || !(await verifyPassword(password, user.password_hash))) {
     recordLoginFailure(email, ip);
     authFail(back, "ایمیل یا رمز عبور اشتباه است");
   }

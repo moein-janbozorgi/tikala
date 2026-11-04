@@ -104,6 +104,42 @@ test("register names are 2-50 letters/spaces and emails need a real-looking doma
   for (const bad of ["ali", "ali@", "ali@example", "ali@example.c", "a li@example.com", `${"a".repeat(250)}@x.com`]) assert.notEqual(emailProblem(bad), null, bad);
 });
 
+test("the client name pattern accepts and rejects the same names as nameProblem", async () => {
+  const { nameProblem } = await import("../lib/validation.ts");
+  const { NAME_PATTERN } = await import("../lib/rules.ts");
+  const pattern = new RegExp(`^(?:${NAME_PATTERN})$`, "v"); // how browsers compile the pattern attribute
+  for (const name of ["علی رضایی", "مریم‌السادات", "John Smith", "علی123", "<b>", "x".repeat(51)]) {
+    assert.equal(pattern.test(name), nameProblem(name.trim()) === null, name);
+  }
+});
+
+test("the client image URL pattern agrees with productProblem", async () => {
+  const { productProblem } = await import("../lib/validation.ts");
+  const { IMAGE_PATTERN } = await import("../lib/rules.ts");
+  const pattern = new RegExp(`^(?:${IMAGE_PATTERN})$`, "v");
+  const base = { name: "کلاه", price: 100000, description: "", subcategory: "" };
+  for (const image of ["https://cdn.example.com/a.jpg", "http://x.ir/a b", "/uploads/a.png", "/", "//evil.com/a.png", "/\\evil.com", "javascript:alert(1)", "http://"]) {
+    assert.equal(pattern.test(image), productProblem({ ...base, image }) === null, image);
+  }
+});
+
+test("product rules: name, price range, image URL, and variant lines that would be lost", async () => {
+  const { productProblem, likeContains } = await import("../lib/validation.ts");
+  const { variantsProblem } = await import("../lib/db.ts");
+  const base = { name: "کلاه", price: 100000, description: "", subcategory: "", image: "" };
+  assert.equal(productProblem(base), null);
+  for (const image of ["https://cdn.example.com/a.jpg", "/uploads/x.png"]) assert.equal(productProblem({ ...base, image }), null, image);
+  for (const bad of [{ name: "ک" }, { name: "x".repeat(101) }, { price: 1.5 }, { price: 999 }, { price: 2e9 }, { price: NaN }, { description: "x".repeat(2001) }, { subcategory: "x" }, { image: "//evil.com/a.png" }, { image: "javascript:alert(1)" }, { image: "/\\evil.com" }]) {
+    assert.notEqual(productProblem({ ...base, ...bad }), null, JSON.stringify(bad));
+  }
+  assert.equal(variantsProblem("M | مشکی | 10\r\nL | سفید | ۵\n\n"), null, "CRLF, Persian digits and blank lines are fine");
+  assert.equal(parseVariants("L | سفید | ۵")[0].stock, 5, "Persian-digit stock is read, not zeroed");
+  for (const bad of ["M | مشکی 10", "M | مشکی | 10 | x", "M | مشکی | -1", "M | مشکی | ده", "M | مشکی | 1\nM | مشکی | 2", `${"x".repeat(21)} | a | 1`]) {
+    assert.notEqual(variantsProblem(bad), null, bad);
+  }
+  assert.equal(likeContains("50%_off\\"), "%50\\%\\_off\\\\%");
+});
+
 test("uploads are recognized by their bytes, not their name", async () => {
   const { detectImageType } = await import("../lib/uploads.ts");
   assert.equal(detectImageType(new Uint8Array([0xff, 0xd8, 0xff, 0xe0])), "jpg");

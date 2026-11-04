@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db, expireUnpaidOrders } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { ORDER_STATUSES, toman } from "@/lib/format";
-import { toLatinDigits } from "@/lib/validation";
+import { likeContains, toLatinDigits } from "@/lib/validation";
 import { OrderCard, type Order } from "../order-card";
 import { deleteOrder, setOrderStatus } from "./actions";
 import { ConfirmButton } from "./confirm-button";
@@ -37,8 +37,8 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
     where.push("CAST(id AS TEXT) = ?");
     args.push(digits);
   } else if (q) {
-    where.push("name LIKE ?");
-    args.push(`%${q}%`);
+    where.push("name LIKE ? ESCAPE '\\'");
+    args.push(likeContains(q));
   }
   // shortcut: newest 200 matching orders only; add paging when the filters stop being enough.
   const orders = db.prepare(`SELECT * FROM orders WHERE ${where.join(" AND ")} ORDER BY id DESC LIMIT 200`).all(...args) as Order[];

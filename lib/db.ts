@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { shippingCost } from "./format.ts";
+import { toLatinDigits } from "./phone.ts";
 import { SAMPLE_PRODUCTS } from "./samples.ts";
 
 const path = process.env.DB_PATH ?? "data/shop.db";
@@ -183,7 +184,24 @@ export function parseVariants(text: string) {
     .split("\n")
     .map((line) => line.split("|").map((s) => s.trim()))
     .filter((parts) => parts.length === 3 && parts[0] && parts[1])
-    .map(([size, color, stock]) => ({ size, color, stock: Math.max(0, Math.floor(Number(stock)) || 0) }));
+    .map(([size, color, stock]) => ({ size, color, stock: Math.max(0, Math.floor(Number(toLatinDigits(stock))) || 0) }));
+}
+
+/** The first line parseVariants would drop or misread, as a Persian error; a typo must not silently delete a variant. */
+export function variantsProblem(text: string) {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length > 100) return "حداکثر ۱۰۰ سایز و رنگ برای هر محصول";
+  const seen = new Set<string>();
+  for (const [i, line] of lines.entries()) {
+    const [size, color, stock, ...extra] = line.split("|").map((s) => s.trim());
+    const at = `خط ${(i + 1).toLocaleString("fa-IR")}`;
+    if (!size || !color || stock === undefined || extra.length) return `${at} باید به شکل «سایز | رنگ | موجودی» باشد`;
+    if (size.length > 20 || color.length > 20) return `${at}: سایز و رنگ هر کدام حداکثر ۲۰ کاراکتر است`;
+    if (!/^\d{1,5}$/.test(toLatinDigits(stock))) return `${at}: موجودی باید عدد صحیح ۰ تا ۹۹۹۹۹ باشد`;
+    if (seen.has(`${size}|${color}`)) return `${at}: این سایز و رنگ تکراری است`;
+    seen.add(`${size}|${color}`);
+  }
+  return null;
 }
 
 export function saveVariants(productId: number, text: string) {

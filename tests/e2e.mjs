@@ -116,6 +116,10 @@ r = await submit("/admin", 2, { id: r.location.split("=")[1], status: "shipped" 
 check(r.location === "/admin" && (await get("/account")).html.includes("ارسال شده"), "admin updates order status");
 r = await submitForm("/admin/products/new", 'name="variants"', { name: "کلاه", price: 100000, category: "اکسسوری", image: "javascript:alert(1)", variants: "", active: "on" });
 check(r.location?.includes("error="), "bad image url rejected");
+r = await submitForm("/admin/products/new", 'name="variants"', { name: "کلاه", price: 100000, category: "اکسسوری", image: "", variants: "Free | قرمز 3", active: "on" });
+check(decodeURIComponent(r.location ?? "").includes("سایز | رنگ | موجودی"), "malformed variant line rejected instead of dropped");
+r = await submitForm("/admin/products/new", 'name="variants"', { name: "کلاه", price: 5e9, category: "اکسسوری", image: "", variants: "", active: "on" });
+check(decodeURIComponent(r.location ?? "").includes("قیمت باید"), "out-of-range price rejected");
 r = await submitForm("/admin/products/new", 'name="variants"', { name: "کلاه بافتنی", price: 200000, category: "اکسسوری", image: "", variants: "Free | قرمز | 3", active: "on" });
 check(r.location === "/admin/products" && (await get("/?category=" + encodeURIComponent("اکسسوری"))).html.includes("کلاه بافتنی"), "admin creates product, shown in category");
 
@@ -169,14 +173,18 @@ check(!/<html[^>]*data-theme=/.test((await get("/")).html), "theme back to syste
 const home = (await get("/")).html;
 check(home.includes('aria-label="افزایش تعداد"') && home.includes('aria-label="کاهش تعداد"') && home.includes(">خرید</button>"), "cards show stepper and buy button");
 const cardVariant = home.match(/name="variantId" checked="" value="(\d+)"/)[1];
-r = await submit("/", 2, { variantId: cardVariant, qty: 3 });
+r = await submit("/", 2, { variantId: cardVariant, qty: 2 }); // this variant has 3 in stock
 const cartQty = (html) => html.match(new RegExp(`name="variantId" value="${cardVariant}"/>[\\s\\S]*?aria-label="تعداد"[^>]*>([۰-۹]+)<`))?.[1];
-check(r.location === "/cart" && cartQty((await get("/cart")).html) === "۳", "card buy adds chosen quantity to cart");
-// Cart stepper: each button posts the quantity it leads to (+ → 4), and at 1 the − becomes a trash button that posts 0.
+check(r.location === "/cart" && cartQty((await get("/cart")).html) === "۲", "card buy adds chosen quantity to cart");
+// Cart stepper: each button posts the quantity it leads to (+ → 3), and at 1 the − becomes a trash button that posts 0.
 let cartHtml = (await get("/cart")).html;
-check(/<button value="4"[^>]*name="qty"/.test(cartHtml) && /<button value="2"[^>]*name="qty"/.test(cartHtml), "cart stepper buttons carry the next quantities");
-r = await submitForm("/cart", `name="variantId" value="${cardVariant}"`, { variantId: cardVariant, qty: 4 });
-check(r.location === "/cart" && cartQty((await get("/cart")).html) === "۴", "cart + raises the quantity");
+check(/<button value="3"[^>]*name="qty"/.test(cartHtml) && /<button value="1"[^>]*name="qty"/.test(cartHtml), "cart stepper buttons carry the next quantities");
+r = await submitForm("/cart", `name="variantId" value="${cardVariant}"`, { variantId: cardVariant, qty: 3 });
+check(r.location === "/cart" && cartQty((await get("/cart")).html) === "۳", "cart + raises the quantity");
+r = await submitForm("/cart", `name="variantId" value="${cardVariant}"`, { variantId: cardVariant, qty: 99999 });
+check(cartQty((await get("/cart")).html) === "۳", "cart quantity can't be posted above stock");
+r = await submitForm("/cart", `name="variantId" value="${cardVariant}"`, { variantId: "abc", qty: 2 });
+check(!decodeURIComponent(cookies.cart ?? "").includes("NaN"), "cart ignores a variant id that isn't one");
 r = await submitForm("/cart", `name="variantId" value="${cardVariant}"`, { variantId: cardVariant, qty: 1 });
 cartHtml = (await get("/cart")).html;
 check(cartQty(cartHtml) === "۱" && cartHtml.includes('aria-label="حذف از سبد خرید"'), "at 1 the − turns into a remove button");
@@ -199,6 +207,8 @@ check(saved?.name === "مریم\u200cالسادات احمدی", "name saved wit
 // Persian 404 page and per-product titles.
 const page404 = await get("/404");
 check((await get("/product/999")).html.includes("صفحه پیدا نشد") && page404.status === 404 && page404.html.includes("صفحه پیدا نشد"), "Persian 404 page");
+const offlinePage = await get("/offline.html");
+check(offlinePage.status === 200 && offlinePage.html.includes("اتصال به اینترنت برقرار نیست") && (await get("/sw.js")).html.includes("/offline.html"), "offline page and its service worker are served, not caught by the 404 redirect");
 check((await get("/no-such-page")).location === "/404" && (await get("/a/b/c")).location === "/404", "unknown addresses redirect to /404");
 check((await get("/product/1")).html.includes("<title>تی‌شرت نخی ساده | تیکلا</title>"), "product page title has product name");
 

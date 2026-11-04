@@ -4,6 +4,9 @@ import { requireAdmin } from "@/lib/auth";
 import { ErrorMessage } from "../../error-message";
 import { addCategory, deleteCategory, renameCategory } from "../actions";
 import { ConfirmButton } from "../confirm-button";
+import { FieldError, ValidatedForm } from "../../validated-form";
+
+const CATEGORY_RULE = "نام دسته‌بندی باید ۲ تا ۴۰ کاراکتر باشد.";
 
 export default async function AdminCategoriesPage({ searchParams }: PageProps<"/admin/categories">) {
   await requireAdmin();
@@ -22,13 +25,14 @@ export default async function AdminCategoriesPage({ searchParams }: PageProps<"/
       {saved ? <p className="alert tone-success">تغییرات ذخیره شد.</p> : null}
       <ErrorMessage error={error} />
 
-      <form action={addCategory} className="card flex flex-wrap items-end gap-3">
+      <ValidatedForm action={addCategory} className="card flex flex-wrap items-end gap-3">
         <label className="block min-w-48 flex-1">
           <span className="mb-1 block text-sm font-medium">دسته‌بندی جدید</span>
-          <input name="name" required minLength={2} maxLength={40} placeholder="مثلاً: کیف" className="input" />
+          <input name="name" required minLength={2} maxLength={40} title={CATEGORY_RULE} placeholder="مثلاً: کیف" className="input" />
+          <FieldError name="name" label="نام دسته‌بندی" />
         </label>
         <button className="btn">افزودن دسته‌بندی</button>
-      </form>
+      </ValidatedForm>
       <p className="text-sm text-muted">
         دسته‌بندی‌های بدون محصول در فروشگاه نمایش داده نمی‌شوند. «نوع» هر محصول (مثل کتانی یا بوت) را در فرم همان محصول بنویسید؛ در منوی فروشگاه زیر دسته‌بندی آن
         نمایش داده می‌شود.
@@ -50,11 +54,14 @@ export default async function AdminCategoriesPage({ searchParams }: PageProps<"/
               ))}
             </div>
             <div className="flex flex-wrap gap-2">
-              <form action={renameCategory} className="flex min-w-60 flex-1 gap-2">
-                <input type="hidden" name="from" value={c.name} />
-                <input name="name" defaultValue={c.name} required minLength={2} maxLength={40} aria-label={`نام جدید ${c.name}`} className="input py-1.5" />
-                <button className="btn-ghost shrink-0 px-3 py-1.5">تغییر نام</button>
-              </form>
+              <ValidatedForm action={renameCategory} className="min-w-60 flex-1">
+                <div className="flex gap-2">
+                  <input type="hidden" name="from" value={c.name} />
+                  <input name="name" defaultValue={c.name} required minLength={2} maxLength={40} title={CATEGORY_RULE} aria-label={`نام جدید ${c.name}`} className="input py-1.5" />
+                  <button className="btn-ghost shrink-0 px-3 py-1.5">تغییر نام</button>
+                </div>
+                <FieldError name="name" label="نام دسته‌بندی" />
+              </ValidatedForm>
               <form action={deleteCategory}>
                 <input type="hidden" name="name" value={c.name} />
                 <ConfirmButton

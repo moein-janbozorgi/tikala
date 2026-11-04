@@ -3,11 +3,11 @@
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { notifyOrder } from "@/lib/sms";
-import { cancelOrder, db, purgeOrder, saveVariants, transaction } from "@/lib/db";
+import { cancelOrder, db, purgeOrder, saveVariants, transaction, variantsProblem } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { ORDER_STATUSES } from "@/lib/format";
 import { saveUpload } from "@/lib/uploads";
-import { errorParam } from "@/lib/validation";
+import { errorParam, productProblem, toLatinDigits } from "@/lib/validation";
 
 const text = (form: FormData, key: string) => String(form.get(key) ?? "").trim().replace(/\s+/g, " ");
 const fail = (path: string, message: string): never =>
@@ -17,15 +17,17 @@ export async function saveProduct(form: FormData) {
   await requireAdmin();
   const id = Number(form.get("id")) || 0;
   const name = text(form, "name");
-  const price = Math.floor(Number(form.get("price")));
+  const price = Number(toLatinDigits(String(form.get("price") ?? "").trim()) || NaN);
   const category = text(form, "category");
+  const subcategory = text(form, "subcategory");
+  const description = String(form.get("description") ?? "").trim();
+  const variants = String(form.get("variants") ?? "");
   let image = String(form.get("image") ?? "").trim();
   const back = id ? `/admin/products/${id}` : "/admin/products/new";
-  if (!name || !(price > 0)) fail(back, "نام و قیمت معتبر وارد کنید");
-  if (image && !/^(https?:\/\/|\/)/.test(image)) fail(back, "آدرس تصویر معتبر نیست");
+  if (id && !db.prepare("SELECT 1 FROM products WHERE id = ?").get(id)) fail("/admin/products", "این محصول پیدا نشد");
   // The category field is free text, so a new name must pass the same rule as the categories page.
-  const categoryError = category ? categoryProblem(category) : null;
-  if (categoryError) fail(back, categoryError);
+  const problem = productProblem({ name, price, description, subcategory, image }) ?? (category ? categoryProblem(category) : null) ?? variantsProblem(variants);
+  if (problem) fail(back, problem);
   // An uploaded file wins over the URL field.
   const file = form.get("imageFile");
   if (file instanceof File && file.size > 0) {
@@ -38,12 +40,12 @@ export async function saveProduct(form: FormData) {
     if (uploadError) fail(back, uploadError);
   }
 
-  const values = [name, String(form.get("description") ?? "").trim(), category, text(form, "subcategory"), price, image, form.get("active") ? 1 : 0];
+  const values = [name, description, category, subcategory, price, image, form.get("active") ? 1 : 0];
   transaction(() => {
     const productId = id
       ? (db.prepare("UPDATE products SET name=?, description=?, category=?, subcategory=?, price=?, image=?, active=? WHERE id=?").run(...values, id), id)
       : (db.prepare("INSERT INTO products (name, description, category, subcategory, price, image, active) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id").get(...values) as { id: number }).id;
-    saveVariants(productId, String(form.get("variants") ?? ""));
+    saveVariants(productId, variants);
     if (category) db.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(category);
   });
   redirect("/admin/products");

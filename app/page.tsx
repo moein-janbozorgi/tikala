@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { db, type Product, type Variant } from "@/lib/db";
+import { likeContains } from "@/lib/validation";
 import { addToCart } from "./actions";
 import { ErrorMessage } from "./error-message";
 import { FEATURES } from "./footer";
@@ -47,7 +48,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     args.push(type);
   }
   if (q) {
-    const like = `%${q.replace(/[\\%_]/g, "\\$&")}%`; // the user's % and _ are literal, not wildcards
+    const like = likeContains(q);
     where.push("(name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR category LIKE ? ESCAPE '\\' OR subcategory LIKE ? ESCAPE '\\')");
     args.push(like, like, like, like);
   }

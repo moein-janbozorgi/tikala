@@ -53,6 +53,23 @@ export function readErrorParam(value: unknown) {
   return given.length === expected.length && timingSafeEqual(given, expected) ? message : null;
 }
 
+/** SQL LIKE pattern for "contains q", with the user's own % and _ taken literally. Use with ESCAPE '\'. */
+export const likeContains = (q: string) => `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+
+// Toman. Keeps order totals (sent to Zarinpal in rial, ×10) far inside safe integer range.
+export const MAX_PRICE = 1_000_000_000;
+
+/** Admin product form rules (the form mirrors them). Returns a Persian error, or null if acceptable. */
+export function productProblem(p: { name: string; price: number; description: string; subcategory: string; image: string }) {
+  if (p.name.length < 2 || p.name.length > 100) return "نام محصول باید ۲ تا ۱۰۰ کاراکتر باشد";
+  if (!Number.isInteger(p.price) || p.price < 1000 || p.price > MAX_PRICE) return "قیمت باید عدد صحیح بین ۱٬۰۰۰ تا ۱٬۰۰۰٬۰۰۰٬۰۰۰ تومان باشد";
+  if (p.description.length > 2000) return "توضیحات حداکثر ۲۰۰۰ کاراکتر است";
+  if (p.subcategory && (p.subcategory.length < 2 || p.subcategory.length > 40)) return "نوع (زیردسته) باید ۲ تا ۴۰ کاراکتر باشد";
+  // http(s) URL or a path on this site; "//host" would load from another site.
+  if (p.image && (p.image.length > 500 || !/^(https?:\/\/[^\s/]+\S*|\/(?![/\\])\S*)$/.test(p.image))) return "آدرس تصویر معتبر نیست";
+  return null;
+}
+
 export function emailProblem(email: string) {
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(email)) return "ایمیل معتبر نیست (مثال: name@example.com)";
   return null;

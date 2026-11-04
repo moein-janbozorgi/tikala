@@ -6,6 +6,7 @@ import { normalizePhone, safeNext } from "@/lib/validation";
 import { login, register, requestCode, verifyCode } from "../actions";
 import { ErrorMessage } from "../error-message";
 import { CloseIcon } from "../icons";
+import { NAME_PATTERN, NAME_RULE } from "@/lib/rules";
 import { FieldError, ValidatedForm } from "../validated-form";
 import { ResendButton } from "./resend-button";
 
@@ -71,12 +72,12 @@ export default async function AuthModal({ params, searchParams }: Props) {
                 {hidden}
                 <label className="block">
                   <span className="mb-1.5 block text-sm font-medium">ایمیل</span>
-                  <input name="email" type="email" autoComplete="email" dir="ltr" required className="input" />
+                  <input name="email" type="email" autoComplete="email" dir="ltr" required maxLength={254} className="input" />
                   <FieldError name="email" label="ایمیل" />
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-sm font-medium">رمز عبور</span>
-                  <input name="password" type="password" autoComplete="current-password" dir="ltr" required className="input" />
+                  <input name="password" type="password" autoComplete="current-password" dir="ltr" required maxLength={64} className="input" />
                   <FieldError name="password" label="رمز عبور" />
                 </label>
                 <button className="btn-ghost w-full">ورود با ایمیل</button>
@@ -123,8 +124,8 @@ async function Register({ hidden, error, loginHref }: ViewProps) {
           required
           maxLength={50}
           // Same rules as nameProblem() / emailProblem() on the server; `title` is the message shown when they fail.
-          pattern="\s*[\p{L}\p{M}‌ ]{2,50}\s*"
-          title="۲ تا ۵۰ کاراکتر، فقط حروف و فاصله"
+          pattern={NAME_PATTERN}
+          title={NAME_RULE}
           className="input"
         />
         <FieldError name="name" label="نام و نام خانوادگی" />
@@ -230,7 +231,8 @@ function Verify({ hidden, error, phone, purpose, loginHref }: ViewProps & { phon
         {purpose === "login" ? (
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium">نام و نام خانوادگی (فقط برای حساب جدید)</span>
-            <input name="name" autoComplete="name" maxLength={50} className="input" />
+            <input name="name" autoComplete="name" maxLength={50} pattern={NAME_PATTERN} title={NAME_RULE} className="input" />
+            <FieldError name="name" label="نام و نام خانوادگی" />
             <span className="mt-1.5 block text-xs text-muted">
               اگر قبلاً با ایمیل ثبت‌نام کرده‌اید، ابتدا با ایمیل وارد شوید و شماره را در حساب کاربری اضافه کنید تا دو حساب جدا ساخته نشود.
             </span>

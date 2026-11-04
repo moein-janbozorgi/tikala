@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getUser } from "@/lib/auth";
 import { getCartLines } from "@/lib/cart";
 import { getFlash } from "@/lib/flash";
+import { NAME_PATTERN, NAME_RULE } from "@/lib/rules";
 import { FREE_SHIPPING_FROM, shippingCost, toman } from "@/lib/format";
 import { checkout, updateCartItem } from "../actions";
 import { FieldError, ValidatedForm } from "../validated-form";
@@ -117,7 +118,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
           <ValidatedForm action={checkout} className="space-y-4 border-t border-line pt-5">
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium">نام گیرنده</span>
-              <input name="name" defaultValue={typed.name ?? user.name} required maxLength={50} autoComplete="name" className="input" />
+              <input name="name" defaultValue={typed.name ?? user.name} required maxLength={50} pattern={NAME_PATTERN} title={NAME_RULE} autoComplete="name" className="input" />
               <FieldError name="name" label="نام گیرنده" />
             </label>
             <label className="block">
@@ -130,6 +131,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
                 autoComplete="tel"
                 dir="ltr"
                 required
+                data-check="phone"
                 className="input text-right"
               />
               <FieldError name="phone" label="شماره موبایل" />
