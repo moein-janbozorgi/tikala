@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { toLatinDigits } from "./phone.ts";
+import { ACCOUNT_NAME_PATTERN, EMAIL_PATTERN } from "./rules.ts";
 
 // In their own file so client forms can use them without pulling in node:crypto.
 export { normalizePhone, toLatinDigits } from "./phone.ts";
@@ -7,7 +8,7 @@ export { normalizePhone, toLatinDigits } from "./phone.ts";
 // Register-form rules besides the password (see passwordProblem). The form mirrors them in `pattern`.
 // Each returns a Persian error, or null if the value is acceptable.
 
-/** 2-50 letters and spaces; \p{L}/\p{M} cover Persian and Latin; the class also holds an invisible U+200C (Persian half-space). */
+/** A checkout recipient: 2-50 letters and spaces; \p{L}/\p{M} cover Persian and Latin; the class also holds an invisible U+200C (Persian half-space). */
 export function nameProblem(name: string) {
   if (!/^[\p{L}\p{M}‌ ]{2,50}$/u.test(name) || (name.match(/\p{L}/gu) ?? []).length < 2) {
     return "نام باید ۲ تا ۵۰ کاراکتر و فقط شامل حروف و فاصله باشد";
@@ -15,6 +16,11 @@ export function nameProblem(name: string) {
   return null;
 }
 
+const ACCOUNT_NAME = new RegExp(`^(?:${ACCOUNT_NAME_PATTERN})$`, "v");
+/** An account's name (register, SMS sign-up): 3-15 letters, spaces not counted. Same regex as the form's `pattern`. */
+export function accountNameProblem(name: string) {
+  return name.length <= 30 && ACCOUNT_NAME.test(name) ? null : "نام باید ۳ تا ۱۵ حرف باشد و فقط شامل حروف و فاصله";
+}
 
 
 /** Postal code as 10 digits (Persian digits and dashes accepted); null if invalid. */
@@ -70,7 +76,8 @@ export function productProblem(p: { name: string; price: number; description: st
   return null;
 }
 
+const EMAIL = new RegExp(`^(?:${EMAIL_PATTERN})$`, "v"); // same regex as the register form's `pattern`
 export function emailProblem(email: string) {
-  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(email)) return "ایمیل معتبر نیست (مثال: name@example.com)";
+  if (email.length > 254 || !EMAIL.test(email)) return "ایمیل معتبر نیست (مثال: name@example.com)";
   return null;
 }

@@ -6,8 +6,9 @@ import { normalizePhone, safeNext } from "@/lib/validation";
 import { login, register, requestCode, verifyCode } from "../actions";
 import { ErrorMessage } from "../error-message";
 import { CloseIcon } from "../icons";
-import { NAME_PATTERN, NAME_RULE } from "@/lib/rules";
+import { ACCOUNT_NAME_PATTERN, ACCOUNT_NAME_RULE, EMAIL_PATTERN } from "@/lib/rules";
 import { FieldError, ValidatedForm } from "../validated-form";
+import { CloseOnEscape } from "./close-on-escape";
 import { ResendButton } from "./resend-button";
 
 // The modal's own params; everything else in the URL belongs to the page under it.
@@ -43,6 +44,7 @@ export default async function AuthModal({ params, searchParams }: Props) {
     <div className="fixed inset-0 z-50 flex overflow-y-auto overscroll-contain bg-black/50 p-4 backdrop-blur-sm">
       {/* Clicking the backdrop closes the modal, like the other dialogs. */}
       <Link href={from} aria-hidden tabIndex={-1} scroll={false} className="fixed inset-0" />
+      <CloseOnEscape href={from} />
       <div role="dialog" aria-modal aria-labelledby="auth-title" className="card relative m-auto w-full max-w-sm space-y-6 p-8">
         <Link href={from} aria-label="بستن" scroll={false} className="icon-btn absolute inset-e-3 top-3">
           <CloseIcon />
@@ -122,10 +124,10 @@ async function Register({ hidden, error, loginHref }: ViewProps) {
           defaultValue={typed.name}
           autoComplete="name"
           required
-          maxLength={50}
-          // Same rules as nameProblem() / emailProblem() on the server; `title` is the message shown when they fail.
-          pattern={NAME_PATTERN}
-          title={NAME_RULE}
+          maxLength={30}
+          // Same rules as accountNameProblem() / emailProblem() on the server; `title` is the message shown when they fail.
+          pattern={ACCOUNT_NAME_PATTERN}
+          title={ACCOUNT_NAME_RULE}
           className="input"
         />
         <FieldError name="name" label="نام و نام خانوادگی" />
@@ -140,7 +142,7 @@ async function Register({ hidden, error, loginHref }: ViewProps) {
           dir="ltr"
           required
           maxLength={254}
-          pattern="\s*[^\s@]+@[^\s@]+\.[A-Za-z]{2,}\s*"
+          pattern={String.raw`\s*(?:${EMAIL_PATTERN})\s*`}
           title="ایمیل معتبر، مثال: name@example.com"
           placeholder="name@example.com"
           className="input"
@@ -231,7 +233,7 @@ function Verify({ hidden, error, phone, purpose, loginHref }: ViewProps & { phon
         {purpose === "login" ? (
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium">نام و نام خانوادگی (فقط برای حساب جدید)</span>
-            <input name="name" autoComplete="name" maxLength={50} pattern={NAME_PATTERN} title={NAME_RULE} className="input" />
+            <input name="name" autoComplete="name" maxLength={30} pattern={ACCOUNT_NAME_PATTERN} title={ACCOUNT_NAME_RULE} className="input" />
             <FieldError name="name" label="نام و نام خانوادگی" />
             <span className="mt-1.5 block text-xs text-muted">
               اگر قبلاً با ایمیل ثبت‌نام کرده‌اید، ابتدا با ایمیل وارد شوید و شماره را در حساب کاربری اضافه کنید تا دو حساب جدا ساخته نشود.

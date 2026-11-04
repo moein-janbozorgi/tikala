@@ -96,12 +96,27 @@ test("new passwords need 8-64 chars, a letter, a digit, and a matching confirmat
   assert.ok(!ok("password1", "password2"), "confirmation mismatch");
 });
 
-test("register names are 2-50 letters/spaces and emails need a real-looking domain", async () => {
-  const { emailProblem, nameProblem } = await import("../lib/validation.ts");
+const EMAILS_OK = ["ali@example.com", "a.b+shop@mail.co.ir", "Ali_99@Sub.Example.travel"];
+const EMAILS_BAD = ["ali", "ali@", "ali@example", "ali@example.c", "a li@example.com", "x@example.commmef", "a..b@x.com", ".a@x.com", "a.@x.com", "a@-x.com", "a@x-.com", "a@x..com", "علی@x.com", "a@x.c0m"];
+
+test("checkout names are 2-50 letters/spaces; account names 3-15 letters; emails the common user@domain.tld form", async () => {
+  const { accountNameProblem, emailProblem, nameProblem } = await import("../lib/validation.ts");
   for (const good of ["علی رضایی", "مریم‌السادات", "John Smith", "Al"]) assert.equal(nameProblem(good), null, good);
   for (const bad of ["ع", " ", "علی123", "<script>", "x".repeat(51), "--"]) assert.notEqual(nameProblem(bad), null, bad);
-  for (const good of ["ali@example.com", "a.b+shop@mail.co.ir"]) assert.equal(emailProblem(good), null, good);
-  for (const bad of ["ali", "ali@", "ali@example", "ali@example.c", "a li@example.com", `${"a".repeat(250)}@x.com`]) assert.notEqual(emailProblem(bad), null, bad);
+  // Spaces and the half-space don't count: «مریم‌سادات نیک» is 12 letters.
+  for (const good of ["علی رضایی", "مریم‌سادات نیک", "Ali", "x".repeat(15), "ابوالفضل محمدی"]) assert.equal(accountNameProblem(good), null, good);
+  for (const bad of ["عل", "Al", "x".repeat(16), "مریم‌السادات احمدی", "علی123", "<b>", " ", "علی_رضا"]) assert.notEqual(accountNameProblem(bad), null, bad);
+  for (const good of EMAILS_OK) assert.equal(emailProblem(good), null, good);
+  for (const bad of [...EMAILS_BAD, `${"a".repeat(250)}@x.com`]) assert.notEqual(emailProblem(bad), null, bad);
+});
+
+test("the register form's name and email patterns agree with the server", async () => {
+  const { accountNameProblem, emailProblem } = await import("../lib/validation.ts");
+  const { ACCOUNT_NAME_PATTERN, EMAIL_PATTERN } = await import("../lib/rules.ts");
+  const name = new RegExp(`^(?:${ACCOUNT_NAME_PATTERN})$`, "v");
+  for (const n of ["علی رضایی", "مریم‌سادات نیک", "عل", "x".repeat(16), "علی123"]) assert.equal(name.test(n), accountNameProblem(n) === null, n);
+  const email = new RegExp(String.raw`^(?:\s*(?:${EMAIL_PATTERN})\s*)$`, "v"); // the input wraps it in \s* (the server trims)
+  for (const e of [...EMAILS_OK, ...EMAILS_BAD]) assert.equal(email.test(e), emailProblem(e) === null, e);
 });
 
 test("the client name pattern accepts and rejects the same names as nameProblem", async () => {

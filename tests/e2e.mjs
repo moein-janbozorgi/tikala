@@ -72,8 +72,8 @@ r = await submitForm("/?auth=register&next=/cart", 'name="confirm"', { name: "ت
 check(r.location?.includes("error="), "short password rejected");
 r = await submitForm("/?auth=register&next=/cart", 'name="confirm"', { name: "تست", email, password: "password123", confirm: "password123", next: "/cart" });
 check(r.location === "/cart" && cookies.session, "register logs in and redirects to next");
-r = await guest(() => submitForm("/?auth=register", 'name="confirm"', { name: "x", email, password: "password123", confirm: "password123", next: "/" }));
-check(r.location?.includes("error="), "duplicate email rejected");
+r = await guest(() => submitForm("/?auth=register", 'name="confirm"', { name: "تست", email, password: "password123", confirm: "password123", next: "/" }));
+check(decodeURIComponent(r.location ?? "").includes("قبلاً ثبت شده"), "duplicate email rejected");
 
 // Signed in: the login and register modals don't open, and the login action itself refuses.
 const signedInLogin = (await get("/?auth=login")).html;
@@ -197,12 +197,16 @@ r = await reg({ name: "علی123", email: `n1${email}` });
 check(decodeURIComponent(r.location ?? "").includes("نام باید"), "invalid name rejected");
 r = await reg({ name: "علی رضایی", email: "bad@example" });
 check(decodeURIComponent(r.location ?? "").includes("ایمیل معتبر نیست"), "invalid email rejected");
+r = await reg({ name: "علی رضایی", email: "bad@example.commmef" });
+check(decodeURIComponent(r.location ?? "").includes("ایمیل معتبر نیست"), "made-up email ending rejected");
+r = await reg({ name: "ابوالفضل محمدی‌نژاد", email: `n3${email}` });
+check(decodeURIComponent(r.location ?? "").includes("۳ تا ۱۵ حرف"), "name over 15 letters rejected");
 const newEmail = `N2${email}`.toUpperCase();
-r = await reg({ name: "  مریم\u200cالسادات    احمدی ", email: newEmail });
+r = await reg({ name: "  مریم\u200cسادات    نیک ", email: newEmail });
 check(r.location === "/", "valid Persian name with half-space registers");
 const { DatabaseSync } = await import("node:sqlite");
 const saved = new DatabaseSync(process.env.DB_PATH).prepare("SELECT name, email FROM users WHERE email = ?").get(newEmail.toLowerCase());
-check(saved?.name === "مریم\u200cالسادات احمدی", "name saved with spaces collapsed, email lowercased");
+check(saved?.name === "مریم\u200cسادات نیک", "name saved with spaces collapsed, email lowercased");
 
 // Persian 404 page and per-product titles.
 const page404 = await get("/404");
