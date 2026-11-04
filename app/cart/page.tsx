@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { getUser } from "@/lib/auth";
-import { getCartLines } from "@/lib/cart";
-import { db } from "@/lib/db";
+import { getCartLines, getCouponCode } from "@/lib/cart";
+import { couponDiscount, db } from "@/lib/db";
 import { getFlash } from "@/lib/flash";
 import { NAME_PATTERN, NAME_RULE } from "@/lib/rules";
 import { FREE_SHIPPING_FROM, shippingCost, toman } from "@/lib/format";
-import { checkout, updateCartItem } from "../actions";
+import { applyCoupon, checkout, updateCartItem } from "../actions";
 import { FieldError, ValidatedForm } from "../validated-form";
 import { AddressFields } from "./address-fields";
 import { ErrorMessage } from "../error-message";
@@ -17,7 +17,11 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
   const lines = await getCartLines();
   const user = await getUser();
   const total = lines.reduce((sum, l) => sum + l.price * l.qty, 0);
-  const shipping = shippingCost(total);
+  // The applied discount code is re-checked on every visit: it may have expired or run out since.
+  const coupon = await getCouponCode();
+  const couponResult = coupon && lines.length ? couponDiscount(coupon, total) : null;
+  const discount = couponResult && "discount" in couponResult ? couponResult.discount : 0;
+  const shipping = shippingCost(total - discount);
   // What the customer typed last time, if the server sent the form back with an error.
   // Otherwise the details of their last order, so a returning customer doesn't retype the address.
   const last = user
@@ -109,17 +113,46 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
             <span className="text-muted">جمع کالاها</span>
             <span>{toman(total)}</span>
           </p>
+          {discount ? (
+            <p className="flex justify-between text-success">
+              <span>
+                تخفیف (<span dir="ltr">{coupon}</span>)
+              </span>
+              <span>− {toman(discount)}</span>
+            </p>
+          ) : null}
           <p className="flex justify-between">
             <span className="text-muted">هزینه ارسال</span>
             {shipping ? <span>{toman(shipping)}</span> : <span className="font-medium text-success">رایگان</span>}
           </p>
           {shipping ? (
-            <p className="text-xs text-muted">با {toman(FREE_SHIPPING_FROM - total)} خرید بیشتر، ارسال رایگان می‌شود.</p>
+            <p className="text-xs text-muted">با {toman(FREE_SHIPPING_FROM - (total - discount))} خرید بیشتر، ارسال رایگان می‌شود.</p>
           ) : null}
         </div>
+        <form action={applyCoupon} className="space-y-1.5">
+          <div className="flex gap-2">
+            <input
+              name="code"
+              defaultValue={coupon}
+              placeholder="کد تخفیف"
+              aria-label="کد تخفیف"
+              dir="ltr"
+              maxLength={20}
+              autoComplete="off"
+              className="input py-2 text-sm uppercase"
+            />
+            <button className="btn-ghost shrink-0">اعمال</button>
+            {coupon ? (
+              <button name="remove" value="1" className="btn-ghost shrink-0 text-danger" aria-label="حذف کد تخفیف">
+                حذف
+              </button>
+            ) : null}
+          </div>
+          {couponResult && "error" in couponResult ? <p className="text-xs text-danger">{couponResult.error}</p> : null}
+        </form>
         <p className="flex justify-between border-t border-line pt-4 text-lg font-bold">
           <span>مبلغ قابل پرداخت</span>
-          <span>{toman(total + shipping)}</span>
+          <span>{toman(total - discount + shipping)}</span>
         </p>
         {user ? (
           <ValidatedForm action={checkout} className="space-y-4 border-t border-line pt-5">

@@ -53,7 +53,7 @@ export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
   return (
     <html lang="fa" dir="rtl" data-theme={theme === "system" ? undefined : theme} className={`${vazirmatn.variable} ${lalezar.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
-        <header className="sticky top-0 z-20 border-b border-line bg-page/85 backdrop-blur">
+        <header className="sticky top-0 z-20 border-b border-line bg-page/85 backdrop-blur print:hidden">
           <nav className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3">
             <button popoverTarget="side-menu" className="icon-btn" aria-label="دسته‌بندی محصولات" title="دسته‌بندی‌ها">
               <MenuIcon />

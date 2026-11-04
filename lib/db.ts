@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { shippingCost } from "./format.ts";
+import { shippingCost, toman } from "./format.ts";
 import { toLatinDigits } from "./phone.ts";
 import { SAMPLE_PRODUCTS } from "./samples.ts";
 
@@ -76,6 +76,8 @@ export type Product = {
   category: string;
   subcategory: string;
   price: number;
+  /** Price before discount, in toman; 0 = not on sale. */
+  compare_price: number;
   image: string;
   active: number;
 };
@@ -193,6 +195,37 @@ transaction(() => {
   `);
 });
 
+// v7: post tracking codes and discount codes on orders, a "price before discount" for sales, extra product photos,
+// discount codes, and a size guide per category.
+transaction(() => {
+  if (schemaVersion() >= 7) return;
+  db.exec(`
+    ALTER TABLE orders ADD COLUMN tracking_code TEXT NOT NULL DEFAULT '';
+    ALTER TABLE orders ADD COLUMN coupon TEXT NOT NULL DEFAULT '';
+    ALTER TABLE orders ADD COLUMN discount INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE products ADD COLUMN compare_price INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE categories ADD COLUMN size_guide TEXT NOT NULL DEFAULT '';
+    CREATE TABLE product_images (
+      id INTEGER PRIMARY KEY,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      path TEXT NOT NULL
+    );
+    CREATE INDEX product_images_product ON product_images (product_id, id);
+    CREATE TABLE coupons (
+      code TEXT PRIMARY KEY,
+      percent INTEGER NOT NULL DEFAULT 0,  -- either a percentage off the goods…
+      amount INTEGER NOT NULL DEFAULT 0,   -- …or a fixed amount in toman
+      min_total INTEGER NOT NULL DEFAULT 0,
+      max_uses INTEGER,                    -- NULL = unlimited
+      used INTEGER NOT NULL DEFAULT 0,
+      expires_on TEXT NOT NULL DEFAULT '', -- 'YYYY-MM-DD', last valid day (Tehran time); '' = never
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    PRAGMA user_version = 7;
+  `);
+});
+
 /** Parses admin input lines like "M | مشکی | 10" into variants. */
 export function parseVariants(text: string) {
   return text
@@ -239,13 +272,45 @@ export function saveVariants(productId: number, text: string) {
   });
 }
 
+export type Coupon = {
+  code: string;
+  percent: number;
+  amount: number;
+  min_total: number;
+  max_uses: number | null;
+  used: number;
+  expires_on: string;
+  active: number;
+};
+
+/** Today's date in Iran (UTC+3:30, no daylight saving since 2022) as YYYY-MM-DD, the format coupons expire in. */
+const tehranToday = (now = Date.now()) => new Date(now + 210 * 60_000).toISOString().slice(0, 10);
+
+/** What a discount code takes off these goods (in toman), or a Persian reason it can't be used. */
+export function couponDiscount(code: string, subtotal: number, now = Date.now()): { discount: number } | { error: string } {
+  const c = db.prepare("SELECT * FROM coupons WHERE code = ?").get(code) as Coupon | undefined;
+  if (!c || !c.active) return { error: "کد تخفیف معتبر نیست" };
+  if (c.expires_on && c.expires_on < tehranToday(now)) return { error: "مهلت استفاده از این کد تخفیف تمام شده است" };
+  if (c.max_uses !== null && c.used >= c.max_uses) return { error: "ظرفیت استفاده از این کد تخفیف تمام شده است" };
+  if (subtotal < c.min_total) return { error: `این کد تخفیف برای خرید از ${toman(c.min_total)} به بالاست` };
+  return { discount: c.percent ? Math.floor((subtotal * c.percent) / 100) : Math.min(c.amount, subtotal) };
+}
+
+/** What the customer pays: goods minus the discount, plus shipping on what's left (so a code can't also unlock free shipping). */
+export const orderTotal = (subtotal: number, discount = 0) => subtotal - discount + shippingCost(subtotal - discount);
+
+// SQL for reports. Iran has no daylight saving time (since 2022), so "today" is UTC+3:30 all year.
+export const TEHRAN = "'+210 minutes'";
+// Orders that count as sales: not cancelled and not still waiting for online payment.
+export const SOLD = "status NOT IN ('cancelled', 'awaiting_payment')";
+
 export type CheckoutInfo = { name: string; phone: string; province: string; city: string; postal_code: string; address: string };
 
 /**
  * Creates an order from cart {variantId: qty}, decrementing stock atomically. Throws a Persian message on failure.
  * Online orders start as awaiting_payment and hold their stock until paid or cancelled.
  */
-export function placeOrder(userId: number, cart: Record<string, number>, info: CheckoutInfo, payment: "cod" | "online" = "cod") {
+export function placeOrder(userId: number, cart: Record<string, number>, info: CheckoutInfo, payment: "cod" | "online" = "cod", couponCode = "") {
   expireUnpaidOrders();
   return transaction(() => {
     let total = 0;
@@ -264,16 +329,26 @@ export function placeOrder(userId: number, cart: Record<string, number>, info: C
       items.push({ ...v, qty });
     }
     if (items.length === 0) throw new Error("سبد خرید خالی است");
-    total += shippingCost(total);
+    let discount = 0;
+    if (couponCode) {
+      // Checked and counted in this same transaction, so two customers can't both take a code's last use.
+      const result = couponDiscount(couponCode, total);
+      if ("error" in result) throw new Error(result.error);
+      discount = result.discount;
+      db.prepare("UPDATE coupons SET used = used + 1 WHERE code = ?").run(couponCode);
+    }
+    total = orderTotal(total, discount);
 
     const order = db
       .prepare(
-        `INSERT INTO orders (user_id, total, name, phone, province, city, postal_code, address, payment, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        `INSERT INTO orders (user_id, total, discount, coupon, name, phone, province, city, postal_code, address, payment, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
       )
       .get(
         userId,
         total,
+        discount,
+        discount ? couponCode : "",
         info.name,
         info.phone,
         info.province,
@@ -308,6 +383,8 @@ export function expireUnpaidOrders() {
 export function cancelOrder(orderId: number) {
   transaction(() => {
     if (!db.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ? AND status != 'cancelled'").run(orderId).changes) return;
+    // A cancelled order gives its discount code's use back.
+    db.prepare("UPDATE coupons SET used = MAX(used - 1, 0) WHERE code = (SELECT coupon FROM orders WHERE id = ? AND coupon != '')").run(orderId);
     for (const it of db.prepare("SELECT variant_id, qty FROM order_items WHERE order_id = ?").all(orderId) as { variant_id: number; qty: number }[]) {
       db.prepare("UPDATE variants SET stock = stock + ? WHERE id = ?").run(it.qty, it.variant_id);
     }

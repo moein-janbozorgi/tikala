@@ -22,6 +22,17 @@ export async function setCart(cart: Cart) {
   });
 }
 
+/** The discount code the customer applied in the cart; checked again at checkout, so the cookie is never trusted. */
+export async function getCouponCode() {
+  return (await cookies()).get("coupon")?.value ?? "";
+}
+
+export async function setCouponCode(code: string) {
+  const store = await cookies();
+  if (code) store.set("coupon", code, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7 });
+  else store.delete("coupon");
+}
+
 export type CartLine = {
   id: number;
   size: string;

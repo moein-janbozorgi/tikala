@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { ErrorMessage } from "../../error-message";
-import { addCategory, deleteCategory, renameCategory } from "../actions";
+import { addCategory, deleteCategory, renameCategory, setSizeGuide } from "../actions";
 import { ConfirmButton } from "../confirm-button";
 import { FieldError, ValidatedForm } from "../../validated-form";
 
@@ -12,8 +12,8 @@ export default async function AdminCategoriesPage({ searchParams }: PageProps<"/
   await requireAdmin();
   const { error, saved } = await searchParams;
   const categories = db
-    .prepare("SELECT c.name, COUNT(p.id) AS n FROM categories c LEFT JOIN products p ON p.category = c.name GROUP BY c.name ORDER BY c.name")
-    .all() as { name: string; n: number }[];
+    .prepare("SELECT c.name, c.size_guide, COUNT(p.id) AS n FROM categories c LEFT JOIN products p ON p.category = c.name GROUP BY c.name ORDER BY c.name")
+    .all() as { name: string; size_guide: string; n: number }[];
   const types = Map.groupBy(
     db.prepare("SELECT DISTINCT category, subcategory FROM products WHERE subcategory != '' ORDER BY subcategory").all() as { category: string; subcategory: string }[],
     (t) => t.category,
@@ -73,6 +73,25 @@ export default async function AdminCategoriesPage({ searchParams }: PageProps<"/
                 </ConfirmButton>
               </form>
             </div>
+            <details className="rounded-xl border border-line p-3" >
+              <summary className="cursor-pointer text-sm font-medium">
+                راهنمای سایز {c.size_guide ? <span className="badge tone-success ms-1">دارد</span> : <span className="text-xs text-muted">(ندارد)</span>}
+              </summary>
+              <form action={setSizeGuide} className="mt-3 space-y-2">
+                <input type="hidden" name="name" value={c.name} />
+                <textarea
+                  name="size_guide"
+                  defaultValue={c.size_guide}
+                  rows={5}
+                  maxLength={2000}
+                  aria-label={`راهنمای سایز ${c.name}`}
+                  placeholder={"سایز | دور سینه | قد\nS | ۹۶ | ۶۸\nM | ۱۰۰ | ۷۰\nاندازه‌ها به سانتی‌متر است."}
+                  className="input font-mono text-sm"
+                />
+                <p className="text-xs text-muted">هر خط یک ردیف جدول، ستون‌ها با «|» جدا شوند؛ خط اول عنوان ستون‌هاست. خط بدون «|» زیر جدول به‌عنوان توضیح نمایش داده می‌شود.</p>
+                <button className="btn-ghost px-3 py-1.5 text-sm">ذخیره راهنمای سایز</button>
+              </form>
+            </details>
           </li>
         ))}
       </ul>

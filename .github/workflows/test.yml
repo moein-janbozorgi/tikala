@@ -1,0 +1,35 @@
+# Every push and pull request: unit tests, a production build, then the end-to-end test against that build
+# (same steps as the README, on a throwaway database).
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: End-to-end test
+        env:
+          DB_PATH: tmp/e2e.db
+          ZARINPAL_SANDBOX: "1"
+          SMS_CONSOLE: "1"
+          ADMIN_PHONE: "09350000009"
+        run: |
+          mkdir -p tmp
+          npx next start -p 3123 > tmp/server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3123/ && break; sleep 1; done
+          npm run test:e2e
+      - name: Server log
+        if: failure()
+        run: cat tmp/server.log || true

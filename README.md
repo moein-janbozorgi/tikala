@@ -57,7 +57,15 @@ Customers sign in with a mobile number and a 6-digit SMS code (email and passwor
 
 ## Product photos
 
-In the admin panel, upload a JPG, PNG or WEBP (up to 5 MB), or paste an image URL. Uploads are saved in `data/uploads`, so **back up the whole `data/` folder**, not just the database.
+In the admin panel, upload a JPG, PNG or WEBP (up to 5 MB each), or paste an image URL, plus up to 8 more photos for the product's gallery. Each upload is stored as a WebP of at most 1200×1500. Uploads are saved in `data/uploads`, so **back up the whole `data/` folder**, not just the database.
+
+## Backups
+
+The server copies the database to `data/backups/shop-YYYY-MM-DD.db` when it starts and then once a day, keeping the newest 14. The admin panel's «دانلود نسخه پشتیبان» link downloads a fresh copy. Both are the database only: product photos are in `data/uploads`. These copies sit on the same disk as the shop, so also copy `data/` to another machine from time to time.
+
+## Automatic tests (GitHub Actions)
+
+`.github/workflows/test.yml` runs the unit tests, a production build and the end-to-end test on every push and pull request. The end-to-end test needs Zarinpal's sandbox; if GitHub's servers can't reach it, that step fails even though the shop works.
 
 ## Other commands
 

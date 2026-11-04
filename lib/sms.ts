@@ -43,15 +43,17 @@ export async function sendLoginCode(phone: string, code: string) {
 
 /** Order update by SMS. Best effort: a failed message is logged and never breaks the order. */
 export async function notifyOrder(orderId: number, event: "placed" | "paid" | "shipped") {
-  const order = db.prepare("SELECT id, phone, total, ref_id FROM orders WHERE id = ?").get(orderId) as
-    | { id: number; phone: string; total: number; ref_id: string | null }
+  const order = db.prepare("SELECT id, phone, total, ref_id, tracking_code FROM orders WHERE id = ?").get(orderId) as
+    | { id: number; phone: string; total: number; ref_id: string | null; tracking_code: string }
     | undefined;
   if (!order) return;
   const n = order.id.toLocaleString("fa-IR");
   const text = {
     placed: `سفارش ${n} ثبت شد. مبلغ: ${toman(order.total)}، پرداخت هنگام تحویل.`,
     paid: `پرداخت سفارش ${n} انجام شد. کد پیگیری: ${order.ref_id ?? "-"}`,
-    shipped: `سفارش ${n} ارسال شد. از خرید شما سپاسگزاریم.`,
+    shipped: order.tracking_code
+      ? `سفارش ${n} ارسال شد. کد رهگیری مرسوله: ${order.tracking_code}. از خرید شما سپاسگزاریم.`
+      : `سفارش ${n} ارسال شد. از خرید شما سپاسگزاریم.`,
   }[event];
   const message = `تیکلا: ${text}`;
   try {

@@ -14,6 +14,9 @@ export type Order = {
   created_at: string;
   payment: string;
   ref_id: string | null;
+  tracking_code: string;
+  coupon: string;
+  discount: number;
 };
 
 type Item = { id: number; product_name: string; size: string; color: string; price: number; qty: number };
@@ -44,7 +47,24 @@ export function OrderCard({ order, children }: { order: Order; children?: React.
             · کد پیگیری: <span dir="ltr">{order.ref_id}</span>
           </>
         ) : null}
+        {order.discount ? (
+          <>
+            {" "}
+            · کد تخفیف <span dir="ltr">{order.coupon}</span>: {toman(order.discount)}
+          </>
+        ) : null}
       </p>
+      {order.tracking_code ? (
+        <p className="text-sm">
+          کد رهگیری مرسوله:{" "}
+          <span dir="ltr" className="font-bold select-all">
+            {order.tracking_code}
+          </span>{" "}
+          <a href="https://tracking.post.ir/" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+            رهگیری در سایت پست
+          </a>
+        </p>
+      ) : null}
       <p className="border-t border-line pt-3 text-sm">
         {order.name} — <span dir="ltr">{order.phone}</span> — {[order.province, order.city, order.address].filter(Boolean).join("، ")}
         {order.postal_code ? (

@@ -1,13 +1,14 @@
 import { db, expireUnpaidOrders } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { payOrder, requestCode, setPassword } from "../actions";
+import { cancelMyOrder, payOrder, requestCode, setPassword } from "../actions";
+import { ConfirmButton } from "../admin/confirm-button";
 import { ErrorMessage } from "../error-message";
 import { OrderCard, type Order } from "../order-card";
 import { FieldError, ValidatedForm } from "../validated-form";
 
 export default async function AccountPage({ searchParams }: PageProps<"/account">) {
   const user = await requireUser("/account");
-  const { order, paid, error, phone, password } = await searchParams;
+  const { order, paid, error, phone, password, cancelled } = await searchParams;
   expireUnpaidOrders();
   const orders = db.prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC").all(user.id) as Order[];
 
@@ -17,16 +18,27 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       {order && !paid && !error ? <p className="alert tone-success">سفارش شما با موفقیت ثبت شد.</p> : null}
       {phone ? <p className="alert tone-success">شماره موبایل به حساب شما اضافه شد.</p> : null}
       {password ? <p className="alert tone-success">رمز عبور ذخیره شد.</p> : null}
+      {cancelled ? <p className="alert tone-success">سفارش لغو شد.</p> : null}
       <ErrorMessage error={error} />
       <h1 className="text-2xl font-extrabold">سفارش‌های من</h1>
       {orders.length === 0 ? <p className="text-muted">هنوز سفارشی ثبت نکرده‌اید.</p> : null}
       {orders.map((o) => (
         <OrderCard key={o.id} order={o}>
-          {o.status === "awaiting_payment" ? (
-            <form action={payOrder}>
-              <input type="hidden" name="orderId" value={o.id} />
-              <button className="btn">پرداخت آنلاین</button>
-            </form>
+          {o.status === "awaiting_payment" || (o.status === "pending" && o.payment === "cod") ? (
+            <div className="flex flex-wrap gap-2">
+              {o.status === "awaiting_payment" ? (
+                <form action={payOrder}>
+                  <input type="hidden" name="orderId" value={o.id} />
+                  <button className="btn">پرداخت آنلاین</button>
+                </form>
+              ) : null}
+              <form action={cancelMyOrder}>
+                <input type="hidden" name="orderId" value={o.id} />
+                <ConfirmButton message={`سفارش #${o.id.toLocaleString("fa-IR")} لغو شود؟`} className="btn-ghost text-danger hover:bg-danger/10">
+                  لغو سفارش
+                </ConfirmButton>
+              </form>
+            </div>
           ) : null}
         </OrderCard>
       ))}

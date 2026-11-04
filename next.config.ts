@@ -2,8 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   experimental: {
-    // Product photo uploads are up to 5 MB (lib/uploads.ts); the default 1 MB would reject them. Extra room is multipart overhead.
-    serverActions: { bodySizeLimit: "6mb" },
+    // The product form uploads photos of up to 5 MB each (lib/uploads.ts), 25 MB per save (app/validated-form.tsx checks
+    // it before sending). Extra room is multipart overhead. Kept this low because it applies to every form.
+    serverActions: { bodySizeLimit: "30mb" },
     // A click or form sent while offline waits and retries instead of failing; app/offline-screen.tsx says why.
     useOffline: true,
   },

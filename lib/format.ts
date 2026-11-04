@@ -1,5 +1,8 @@
 export const toman = (n: number) => `${n.toLocaleString("fa-IR")} تومان`;
 
+/** Whole percent off for a sale price ("price before discount" = compare); 0 when not on sale. */
+export const percentOff = (price: number, compare: number) => (compare > price ? Math.round((1 - price / compare) * 100) : 0);
+
 /** A size/colour with this many or fewer left (but not 0) counts as "low stock" in the admin panel. */
 export const LOW_STOCK = 2;
 

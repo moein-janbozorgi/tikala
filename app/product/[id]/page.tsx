@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db, type Product, type Variant } from "@/lib/db";
-import { SITE_URL, toman } from "@/lib/format";
+import { percentOff, SITE_URL, toman } from "@/lib/format";
 import { addToCart } from "../../actions";
 import { ErrorMessage } from "../../error-message";
 import { ProductImage } from "../../product-image";
@@ -30,6 +30,20 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
   if (!product) notFound();
   const variants = db.prepare("SELECT * FROM variants WHERE product_id = ? ORDER BY id").all(product.id) as Variant[];
   const firstInStock = variants.find((v) => v.stock > 0);
+  const photos = [product.image, ...(db.prepare("SELECT path FROM product_images WHERE product_id = ? ORDER BY id").all(product.id) as { path: string }[]).map((r) => r.path)].filter(Boolean);
+  const off = percentOff(product.price, product.compare_price);
+  const sizeGuide = product.category
+    ? ((db.prepare("SELECT size_guide FROM categories WHERE name = ?").get(product.category) as { size_guide: string } | undefined)?.size_guide ?? "")
+    : "";
+  // Same category, in-stock ones first, closest in price.
+  const related = product.category
+    ? (db
+        .prepare(
+          `SELECT p.* FROM products p WHERE p.active = 1 AND p.category = ? AND p.id != ?
+           ORDER BY EXISTS (SELECT 1 FROM variants v WHERE v.product_id = p.id AND v.stock > 0) DESC, ABS(p.price - ?) LIMIT 4`,
+        )
+        .all(product.category, product.id, product.price) as Product[])
+    : [];
   // Structured data, so Google can show the price and stock right in search results. Schema.org needs an ISO currency,
   // and the toman isn't one, so the price goes in rial (×10).
   const jsonLd = {
@@ -37,7 +51,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
     "@type": "Product",
     name: product.name,
     description: product.description || undefined,
-    image: product.image ? new URL(product.image, SITE_URL).href : undefined,
+    image: photos.length ? photos.map((src) => new URL(src, SITE_URL).href) : undefined,
     sku: String(product.id),
     category: product.category || undefined,
     offers: {
@@ -68,11 +82,43 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
       </nav>
 
       <div className="grid gap-10 md:grid-cols-2">
-        <ProductImage src={product.image} alt={product.name} className="aspect-[4/5] w-full rounded-3xl" />
+        {/* Gallery: swipe (or scroll) between photos; thumbnails jump to one. Plain links and CSS, so no JavaScript needed. */}
+        <div className="min-w-0">
+          <div className="relative">
+            <div className="flex snap-x snap-mandatory overflow-x-auto rounded-3xl [scrollbar-width:none]">
+              {(photos.length ? photos : [""]).map((src, i) => (
+                <div key={i} id={`photo-${i + 1}`} className="w-full shrink-0 snap-center scroll-mt-24">
+                  <ProductImage src={src} alt={i ? `${product.name}، تصویر ${(i + 1).toLocaleString("fa-IR")}` : product.name} className="aspect-4/5 w-full" />
+                </div>
+              ))}
+            </div>
+            {off ? (
+              <span className="absolute top-4 left-4 rounded-full bg-danger px-3 py-1.5 text-sm font-bold text-page">
+                {`${off.toLocaleString("fa-IR")}٪ تخفیف`}
+              </span>
+            ) : null}
+          </div>
+          {photos.length > 1 ? (
+            <nav aria-label="تصاویر محصول" className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              {photos.map((src, i) => (
+                <a key={i} href={`#photo-${i + 1}`} aria-label={`تصویر ${(i + 1).toLocaleString("fa-IR")}`} className="shrink-0 rounded-xl ring-accent hover:ring-2">
+                  <ProductImage src={src} alt="" className="size-16 rounded-xl sm:size-20" />
+                </a>
+              ))}
+            </nav>
+          ) : null}
+        </div>
         <div className="md:py-4">
           <ErrorMessage error={error} />
           <h1 className="text-3xl font-extrabold">{product.name}</h1>
-          <p className="mt-3 text-2xl font-bold text-accent">{toman(product.price)}</p>
+          <p className="mt-3 flex flex-wrap items-baseline gap-x-3">
+            <span className="text-2xl font-bold text-accent">{toman(product.price)}</span>
+            {off ? (
+              <s className="text-muted" aria-label={`قیمت قبل از تخفیف ${toman(product.compare_price)}`}>
+                {toman(product.compare_price)}
+              </s>
+            ) : null}
+          </p>
           <p className="mt-6 leading-8 whitespace-pre-line text-muted">{product.description}</p>
 
           <form action={addToCart} className="mt-8 space-y-6">
@@ -107,9 +153,76 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
             </div>
           </form>
 
+          {sizeGuide ? <SizeGuide text={sizeGuide} /> : null}
           <p className="mt-8 border-t border-line pt-6 text-sm text-muted">پرداخت آنلاین با زرین‌پال یا پرداخت هنگام تحویل</p>
         </div>
       </div>
+
+      {related.length ? (
+        <section className="mt-16">
+          <h2 className="mb-4 text-xl font-extrabold">محصولات مشابه</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
+            {related.map((p) => (
+              <Link key={p.id} href={`/product/${p.id}`} className="group rounded-2xl border border-line bg-surface p-2">
+                <ProductImage src={p.image} alt={p.name} className="aspect-4/5 w-full rounded-xl" />
+                <p className="mt-2 line-clamp-1 px-1 text-sm font-bold group-hover:text-accent">{p.name}</p>
+                <p className="px-1 text-sm">
+                  {toman(p.price)}
+                  {percentOff(p.price, p.compare_price) ? (
+                    <span className="ms-1.5 text-xs font-bold text-danger">{`${percentOff(p.price, p.compare_price).toLocaleString("fa-IR")}٪`}</span>
+                  ) : null}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </>
+  );
+}
+
+/**
+ * The category's size guide, written by the admin as lines of "cell | cell | …"; the first line is the header.
+ * Lines without "|" are shown as notes under the table.
+ */
+function SizeGuide({ text }: { text: string }) {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const rows = lines.filter((l) => l.includes("|")).map((l) => l.split("|").map((c) => c.trim()));
+  const notes = lines.filter((l) => !l.includes("|"));
+  return (
+    <details className="mt-6 rounded-2xl border border-line p-4">
+      <summary className="cursor-pointer font-medium">راهنمای سایز</summary>
+      {rows.length ? (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-center text-sm">
+            <thead>
+              <tr className="border-b border-line">
+                {rows[0].map((c, i) => (
+                  <th key={i} className="px-2 py-2 font-bold">
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice(1).map((r, i) => (
+                <tr key={i} className="border-b border-line last:border-0">
+                  {r.map((c, j) => (
+                    <td key={j} className="px-2 py-2">
+                      {c}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {notes.map((n, i) => (
+        <p key={i} className="mt-2 text-sm text-muted">
+          {n}
+        </p>
+      ))}
+    </details>
   );
 }

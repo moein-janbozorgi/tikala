@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { db, expireUnpaidOrders } from "@/lib/db";
+import { db, expireUnpaidOrders, SOLD, TEHRAN } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { LOW_STOCK, ORDER_STATUSES, toman } from "@/lib/format";
 import { likeContains, toLatinDigits } from "@/lib/validation";
@@ -12,10 +12,6 @@ const PAGE_SIZE = 30;
 // The normal path of an order; any step can be clicked to jump to it.
 const STEPS = ["pending", "processing", "shipped", "delivered"];
 
-// Iran has no daylight saving time (since 2022), so "today" is UTC+3:30 all year.
-const TEHRAN = "'+210 minutes'";
-// Orders that count as sales: not cancelled and not still waiting for online payment.
-const SOLD = "status NOT IN ('cancelled', 'awaiting_payment')";
 
 export default async function AdminOrdersPage({ searchParams }: PageProps<"/admin">) {
   await requireAdmin();
@@ -113,6 +109,24 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
           <form action={setOrderStatus} className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
             <input type="hidden" name="id" value={o.id} />
             <input type="hidden" name="back" value={here} />
+            {o.status === "cancelled" || o.status === "awaiting_payment" ? null : (
+              <div className="flex w-full flex-wrap items-center gap-2">
+                <input
+                  name="tracking_code"
+                  defaultValue={o.tracking_code}
+                  placeholder="کد رهگیری مرسوله"
+                  aria-label={`کد رهگیری مرسوله سفارش ${o.id}`}
+                  dir="ltr"
+                  maxLength={30}
+                  className="input w-56 py-1.5 text-sm"
+                />
+                {/* The form's first button, so Enter in the code field saves it without moving the order to another step. */}
+                <button name="status" value={o.status} className="btn-ghost px-3 py-1.5 text-xs">
+                  ذخیره کد
+                </button>
+                <span className="text-xs text-muted">پیش از «ارسال شده» وارد کنید تا در پیامک مشتری بیاید.</span>
+              </div>
+            )}
             {o.status === "cancelled" ? null : (
               <ol aria-label="مراحل سفارش" className="flex flex-wrap items-center gap-1">
                 {/* Only checkout sets "awaiting payment"; it is shown just for orders that are in it. */}
@@ -137,6 +151,9 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
               </ol>
             )}
             <div className="ms-auto flex gap-2">
+              <Link href={`/admin/orders/${o.id}/invoice`} target="_blank" className="btn-ghost px-3 py-1.5 text-xs">
+                فاکتور
+              </Link>
               {o.status === "cancelled" ? null : (
                 <ConfirmButton
                   name="status"

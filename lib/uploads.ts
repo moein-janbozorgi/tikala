@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import sharp from "sharp";
 
@@ -38,6 +38,12 @@ export async function saveUpload(file: File) {
   await mkdir(UPLOAD_DIR, { recursive: true });
   await writeFile(join(UPLOAD_DIR, name), webp);
   return `/uploads/${name}`;
+}
+
+/** Deletes a saved upload by its public path; anything that isn't one of our generated names is ignored. */
+export async function deleteUpload(path: string) {
+  const name = path.replace(/^\/uploads\//, "");
+  if (path.startsWith("/uploads/") && NAME.test(name)) await rm(join(UPLOAD_DIR, name), { force: true });
 }
 
 /** Reads a saved upload by its file name; null for anything that isn't one of our generated names. */

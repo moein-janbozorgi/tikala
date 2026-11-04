@@ -274,3 +274,78 @@ test("shipping is 85,000 toman below 5,000,000 and free from it", () => {
   assert.equal(shippingCost(5_000_000), 0);
   assert.equal(shippingCost(7_000_000), 0);
 });
+
+test("daily backup writes one consistent copy per day and keeps the newest 14", async () => {
+  const { mkdtempSync, readdirSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { DatabaseSync } = await import("node:sqlite");
+  const { backupNow, dailyBackup } = await import("../lib/backup.ts");
+  const dir = mkdtempSync(join(tmpdir(), "tikla-backup-"));
+  for (let day = 1; day <= 16; day++) dailyBackup(dir, `2026-01-${String(day).padStart(2, "0")}`);
+  dailyBackup(dir, "2026-01-16"); // same day again: no error, no second file
+  const files = readdirSync(dir).sort();
+  assert.equal(files.length, 14);
+  assert.equal(files[0], "shop-2026-01-03.db", "the two oldest were deleted");
+  const copy = new DatabaseSync(join(dir, files.at(-1)!));
+  assert.ok((copy.prepare("SELECT COUNT(*) AS n FROM products").get() as { n: number }).n > 0, "the backup holds the shop's data");
+  copy.close();
+  assert.equal(backupNow().subarray(0, 15).toString(), "SQLite format 3", "download is a real SQLite file");
+});
+
+test("discount codes: percent or capped amount, minimum, expiry, use limit, inactive", async () => {
+  const { couponDiscount } = await import("../lib/db.ts");
+  const add = (code: string, fields: Record<string, number | string | null>) =>
+    db.prepare(`INSERT INTO coupons (code, ${Object.keys(fields).join(", ")}) VALUES (?, ${Object.keys(fields).map(() => "?").join(", ")})`).run(code, ...Object.values(fields));
+  add("P20", { percent: 20 });
+  add("A50K", { amount: 50_000, min_total: 200_000 });
+  add("OLD", { percent: 10, expires_on: "2026-01-01" });
+  add("ONCE", { percent: 10, max_uses: 1, used: 1 });
+  add("OFF", { percent: 10, active: 0 });
+  assert.deepEqual(couponDiscount("P20", 123_456), { discount: 24_691 }, "20%, rounded down to whole toman");
+  assert.deepEqual(couponDiscount("A50K", 300_000), { discount: 50_000 });
+  assert.ok("error" in couponDiscount("A50K", 199_999), "below the minimum");
+  assert.deepEqual(couponDiscount("OLD", 100_000, Date.parse("2026-01-01T20:00:00Z")), { discount: 10_000 }, "still valid on its last day (Tehran time)");
+  assert.ok("error" in couponDiscount("OLD", 100_000, Date.parse("2026-01-01T21:00:00Z")), "expired once Tehran's next day starts");
+  for (const code of ["ONCE", "OFF", "NOPE"]) assert.ok("error" in couponDiscount(code, 100_000), code);
+});
+
+test("placeOrder applies a code, counts its use atomically, and cancelling gives the use back", async () => {
+  const { orderTotal } = await import("../lib/db.ts");
+  db.prepare("INSERT INTO coupons (code, percent, max_uses) VALUES ('LAST1', 10, 1)").run();
+  const v = db.prepare("SELECT v.id, p.price FROM variants v JOIN products p ON p.id = v.product_id WHERE v.stock >= 2 LIMIT 1").get() as { id: number; price: number };
+  const orderId = placeOrder(user.id, { [v.id]: 1 }, info, "cod", "LAST1");
+  const order = db.prepare("SELECT total, discount, coupon FROM orders WHERE id = ?").get(orderId) as { total: number; discount: number; coupon: string };
+  assert.equal(order.discount, Math.floor(v.price / 10));
+  assert.equal(order.coupon, "LAST1");
+  assert.equal(order.total, orderTotal(v.price, order.discount), "shipping charged on the discounted amount");
+  assert.throws(() => placeOrder(user.id, { [v.id]: 1 }, info, "cod", "LAST1"), /ظرفیت/, "the only use is taken");
+  cancelOrder(orderId);
+  assert.equal((db.prepare("SELECT used FROM coupons WHERE code = 'LAST1'").get() as { used: number }).used, 0, "cancel returns the use");
+});
+
+test("admin discount-code rules", async () => {
+  const { couponProblem, normalizeCoupon } = await import("../lib/validation.ts");
+  const base = { code: "YALDA30", percent: 30, amount: 0, min_total: 0, max_uses: null, expires_on: "" };
+  assert.equal(couponProblem(base), null);
+  assert.equal(normalizeCoupon(" yalda ۳۰ "), "YALDA30");
+  for (const bad of [{ code: "AB" }, { code: "یلدا" }, { percent: 0 }, { percent: 91 }, { percent: 10, amount: 5000 }, { percent: 0, amount: 500 }, { max_uses: 0 }, { min_total: -1 }, { expires_on: "1404-10-01x" }]) {
+    assert.notEqual(couponProblem({ ...base, ...bad }), null, JSON.stringify(bad));
+  }
+});
+
+test("sale prices: before-price must be higher; percent off is whole", async () => {
+  const { productProblem } = await import("../lib/validation.ts");
+  const { percentOff } = await import("../lib/format.ts");
+  const base = { name: "کلاه", price: 80_000, description: "", subcategory: "", image: "" };
+  assert.equal(productProblem({ ...base, compare_price: 100_000 }), null);
+  assert.equal(productProblem({ ...base, compare_price: 0 }), null, "0 = not on sale");
+  for (const compare_price of [80_000, 70_000, 1.5e5 + 0.5]) assert.notEqual(productProblem({ ...base, compare_price }), null, String(compare_price));
+  assert.equal(percentOff(80_000, 100_000), 20);
+  assert.equal(percentOff(100_000, 0), 0);
+});
+
+test("CSV export quotes every cell and defuses Excel formulas", async () => {
+  const { csv } = await import("../lib/csv.ts");
+  assert.equal(csv([["a", 'say "hi"', null], ["=HYPERLINK(\"x\")", "-1", "09121234567"]]), '"a","say ""hi""",""\r\n"\'=HYPERLINK(""x"")","\'-1","09121234567"');
+});

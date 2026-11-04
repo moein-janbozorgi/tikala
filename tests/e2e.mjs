@@ -29,7 +29,8 @@ async function submit(path, actionIndex, fields) {
   const ids = [...html.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1]);
   const form = new FormData();
   form.append(ids[actionIndex], "");
-  for (const [k, v] of Object.entries(fields)) form.append(k, v instanceof Blob ? v : String(v));
+  // An array sends the field several times (like a multi-file input).
+  for (const [k, v] of Object.entries(fields)) for (const one of [v].flat()) form.append(k, one instanceof Blob ? one : String(one));
   const res = await fetch(base + path, { method: "POST", body: form, headers: { cookie: cookieHeader(), origin: base }, redirect: "manual" });
   store(res);
   return { status: res.status, location: res.headers.get("location") };
@@ -228,7 +229,7 @@ check((await get("/robots.txt")).html.includes("Disallow: /admin") && (await get
 
 const ld = JSON.parse((await get("/product/1")).html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)?.[1] ?? "null");
 const product1Price = new DatabaseSync(process.env.DB_PATH).prepare("SELECT price FROM products WHERE id = 1").get().price;
-check(ld?.["@type"] === "Product" && ld.offers.price === product1Price * 10 && ld.offers.priceCurrency === "IRR" && ld.offers.availability.endsWith("InStock") && ld.image.startsWith("http"), "product page has Product structured data (price in rial, stock, absolute image)");
+check(ld?.["@type"] === "Product" && ld.offers.price === product1Price * 10 && ld.offers.priceCurrency === "IRR" && ld.offers.availability.endsWith("InStock") && ld.image.every((src) => src.startsWith("http")), "product page has Product structured data (price in rial, stock, absolute image)");
 const canonicalOf = (html) => html.match(/<link rel="canonical" href="([^"]+)"/)?.[1];
 const shoes = (await get("/?category=" + encodeURIComponent("کفش") + "&sort=cheap&page=2")).html;
 check(shoes.includes("<title>کفش | تیکلا</title>") && decodeURIComponent(canonicalOf(shoes) ?? "").endsWith("/?category=کفش"), "category page has its own title; sorted/paged versions point to it as canonical");
@@ -317,6 +318,85 @@ const orderCards = (html) => html.split("سفارش #<!-- -->").length - 1;
 check(orderCards((await get(`/admin?q=${unpaidId}`)).html) === 1, "admin finds an order by its number");
 check(orderCards((await get(`/admin?status=cancelled&q=${unpaidId}`)).html) === 1 && orderCards((await get("/admin?status=delivered")).html) === 0, "admin filters orders by status");
 check(orderCards((await get("/admin?q=" + encodeURIComponent("تست"))).html) > 0 && orderCards((await get("/admin?q=" + encodeURIComponent("ناشناس"))).html) === 0, "admin searches orders by customer name");
+
+// ---------- After the sale: customer cancel, tracking code, invoice ----------
+const sqlite = () => new DatabaseSync(process.env.DB_PATH);
+const stockOf = (id) => sqlite().prepare("SELECT stock FROM variants WHERE id = ?").get(id).stock;
+// Earlier checks used up this size; restock it so the orders below can be placed.
+sqlite().prepare("UPDATE variants SET stock = stock + 10 WHERE id = ?").run(variantId);
+const codCheckout = () =>
+  submitForm("/cart", 'name="postal_code"', { name: "تست", phone: "09121234567", province: "تهران", city: "تهران", postal_code: "1234567890", address: "تهران، خیابان آزادی", payment: "cod" });
+await submit("/product/1", 2, { variantId, qty: 1 });
+const stockBeforeOwnCancel = stockOf(variantId);
+const ownId = (await codCheckout()).location.match(/order=(\d+)/)[1];
+r = await submitForm("/account", `name="orderId" value="${ownId}"`, { orderId: ownId });
+check(r.location === "/account?cancelled=1" && sqlite().prepare("SELECT status FROM orders WHERE id = ?").get(ownId).status === "cancelled" && stockOf(variantId) === stockBeforeOwnCancel, "customer cancels their own unreviewed order, stock returns");
+
+await submit("/product/1", 2, { variantId, qty: 1 });
+const shipId = (await codCheckout()).location.match(/order=(\d+)/)[1];
+// admin forms: 0 logout, 1 theme, 2 = status form of the newest order (this one)
+r = await submit("/admin", 2, { id: shipId, status: "shipped", tracking_code: "rr 123456789 ir", back: "/admin" });
+await new Promise((res) => setTimeout(res, 300)); // the SMS goes out just after the response
+check(r.location === "/admin" && outbox().includes("کد رهگیری مرسوله: RR123456789IR") && (await get("/account")).html.includes("RR123456789IR"), "tracking code saved with 'shipped', sent in the SMS and shown to the customer");
+r = await submit("/admin", 2, { id: shipId, status: "shipped", tracking_code: "bad!", back: "/admin" });
+check(decodeURIComponent(r.location ?? "").includes("کد رهگیری باید"), "malformed tracking code rejected");
+const invoice = await get(`/admin/orders/${shipId}/invoice`);
+check(invoice.status === 200 && invoice.html.includes("فاکتور فروش") && invoice.html.includes("تی‌شرت نخی ساده") && invoice.html.includes("RR123456789IR"), "printable invoice lists the order");
+check((await guest(() => get(`/admin/orders/${shipId}/invoice`))).status !== 200, "invoice is admin-only");
+
+// ---------- Sale price, gallery, size guide, related products ----------
+const red = await sharp({ create: { width: 800, height: 1000, channels: 3, background: "#a33" } }).png().toBuffer();
+const blue = await sharp({ create: { width: 800, height: 1000, channels: 3, background: "#33a" } }).png().toBuffer();
+const shawl = { name: "شال حراجی", price: 80000, compare_price: 100000, category: "اکسسوری", image: "", variants: "Free | آبی | 5", active: "on" };
+r = await submitForm("/admin/products/new", 'name="variants"', { ...shawl, compare_price: 80000 });
+check(decodeURIComponent(r.location ?? "").includes("قیمت قبل از تخفیف"), "before-price not above the price is rejected");
+r = await submitForm("/admin/products/new", 'name="variants"', { ...shawl, photos: [new File([red], "a.png", { type: "image/png" }), new File([blue], "b.png", { type: "image/png" })] });
+const shawlId = sqlite().prepare("SELECT id FROM products WHERE name = ?").get("شال حراجی").id;
+check(/^\/uploads\/.+\.webp$/.test(sqlite().prepare("SELECT image FROM products WHERE id = ?").get(shawlId).image), "with no main photo, the first gallery photo becomes the main one");
+const saleList = (await get("/?sale=1")).html;
+check(r.location === "/admin/products" && saleList.includes("شال حراجی") && saleList.includes("۲۰٪ تخفیف") && !saleList.includes("تی‌شرت نخی ساده"), "sale filter lists only discounted products, with the % badge");
+let shawlPage = (await get(`/product/${shawlId}`)).html;
+check(shawlPage.includes('href="#photo-2"') && (shawlPage.match(/id="photo-\d"/g) ?? []).length === 2 && /<s [^>]*>[^<]*۱۰۰٬۰۰۰/.test(shawlPage), "product page shows the gallery and the struck-through old price");
+check(shawlPage.includes("محصولات مشابه") && shawlPage.includes("کلاه زمستانی"), "related products from the same category");
+const photo = sqlite().prepare("SELECT id, path FROM product_images WHERE product_id = ? ORDER BY id LIMIT 1").get(shawlId);
+r = await submitForm(`/admin/products/${shawlId}`, 'name="variants"', { ...shawl, id: shawlId, image: sqlite().prepare("SELECT image FROM products WHERE id = ?").get(shawlId).image, remove_photo: photo.id });
+check(sqlite().prepare("SELECT COUNT(*) AS n FROM product_images WHERE product_id = ?").get(shawlId).n === 0 && (await fetch(base + photo.path)).status === 404, "removing a gallery photo deletes it and its file");
+r = await submitForm("/admin/categories", 'aria-label="راهنمای سایز اکسسوری"', { name: "اکسسوری", size_guide: "سایز | دور سر\nFree | ۵۶\nاندازه‌ها به سانتی‌متر است." });
+shawlPage = (await get(`/product/${shawlId}`)).html;
+check(r.location === "/admin/categories?saved=1" && shawlPage.includes("راهنمای سایز") && shawlPage.includes("<th") && shawlPage.includes("دور سر") && shawlPage.includes("به سانتی‌متر"), "category size guide shows as a table on its products");
+
+// ---------- Discount codes ----------
+const newCoupon = (fields) => submitForm("/admin/coupons", 'name="expires_on"', { kind: "percent", value: 10, min_total: "", max_uses: "", expires_on: "", ...fields });
+r = await newCoupon({ code: "e2e10" });
+check(r.location === "/admin/coupons?saved=1" && (await get("/admin/coupons")).html.includes("E2E10"), "admin creates a discount code (saved in capitals)");
+r = await newCoupon({ code: "E2E10" });
+check(decodeURIComponent(r.location ?? "").includes("از قبل وجود دارد"), "duplicate discount code rejected");
+r = await newCoupon({ code: "BIG", value: 95 });
+check(decodeURIComponent(r.location ?? "").includes("۱ تا ۹۰"), "out-of-range percent rejected");
+await submit("/product/1", 2, { variantId, qty: 1 });
+r = await submitForm("/cart", 'aria-label="کد تخفیف"', { code: "NOPE" });
+check(decodeURIComponent(r.location ?? "").includes("کد تخفیف معتبر نیست"), "unknown discount code rejected in the cart");
+r = await submitForm("/cart", 'aria-label="کد تخفیف"', { code: "e2e10" });
+const discountedCart = (await get("/cart")).html;
+check(r.location === "/cart" && discountedCart.includes("E2E10") && discountedCart.includes("− "), "cart shows the applied discount");
+const discountedId = (await codCheckout()).location.match(/order=(\d+)/)[1];
+const discounted = sqlite().prepare("SELECT total, discount, coupon FROM orders WHERE id = ?").get(discountedId);
+const unit = sqlite().prepare("SELECT price FROM products WHERE id = 1").get().price;
+check(discounted.coupon === "E2E10" && discounted.discount === Math.floor(unit / 10) && sqlite().prepare("SELECT used FROM coupons WHERE code = 'E2E10'").get().used === 1 && !cookies.coupon, "checkout stores the discount, counts the use and clears the code");
+
+// ---------- Reports, CSV export, backup ----------
+const report = (await get("/admin/reports")).html;
+check(report.includes("پرفروش‌ترین محصولات") && report.includes("تی‌شرت نخی ساده"), "sales report lists best sellers");
+const exported = await fetch(base + "/admin/export", { headers: { cookie: cookieHeader() } });
+// Raw bytes: text() would silently drop the BOM that makes Excel read the file as UTF-8.
+const exportedBytes = Buffer.from(await exported.arrayBuffer());
+const exportedText = exportedBytes.toString("utf8");
+check(exported.headers.get("content-type")?.startsWith("text/csv") && exportedBytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf])) && exportedText.includes('"شماره سفارش"') && exportedText.includes('"E2E10"'), "orders export as Excel-ready CSV");
+const backup = await fetch(base + "/admin/backup", { headers: { cookie: cookieHeader() } });
+check(Buffer.from(await backup.arrayBuffer()).subarray(0, 15).toString() === "SQLite format 3", "admin downloads a database backup");
+check((await fetch(base + "/admin/backup", { redirect: "manual" })).status !== 200 && (await fetch(base + "/admin/export", { redirect: "manual" })).status !== 200, "backup and export are admin-only");
+const { readdirSync } = await import("node:fs");
+check(readdirSync(join(dirname(process.env.DB_PATH), "backups")).some((f) => /^shop-\d{4}-\d{2}-\d{2}\.db$/.test(f)), "server made today's automatic backup on start");
 
 // ---------- Phone login, linking a phone, and "forgot password" ----------
 const p1 = "09350000001";

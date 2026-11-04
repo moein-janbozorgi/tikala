@@ -15,6 +15,7 @@ export function ProductForm({ product, variants = [] }: { product?: Product; var
     subcategory: string;
   }[])
     (types[t.category] ??= []).push(t.subcategory);
+  const photos = product ? (db.prepare("SELECT id, path FROM product_images WHERE product_id = ? ORDER BY id").all(product.id) as { id: number; path: string }[]) : [];
   return (
     <ValidatedForm action={saveProduct} className="card space-y-3">
       <input type="hidden" name="id" value={product?.id ?? ""} />
@@ -23,12 +24,30 @@ export function ProductForm({ product, variants = [] }: { product?: Product; var
         <input name="name" defaultValue={product?.name} required minLength={2} maxLength={100} title="۲ تا ۱۰۰ کاراکتر" className="input" />
         <FieldError name="name" label="نام محصول" />
       </label>
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <CategoryFields categories={categories} types={types} category={product?.category ?? ""} subcategory={product?.subcategory ?? ""} />
         <label className="block">
           <span className="mb-1 block text-sm">قیمت (تومان)</span>
           <input name="price" type="number" min={1000} max={MAX_PRICE} step={1} defaultValue={product?.price} required dir="ltr" className="input" />
           <FieldError name="price" label="قیمت" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm">قیمت قبل از تخفیف (اختیاری)</span>
+          <input
+            name="compare_price"
+            type="number"
+            min={1001}
+            max={MAX_PRICE}
+            step={1}
+            defaultValue={product?.compare_price || ""}
+            dir="ltr"
+            aria-describedby="compare-hint"
+            className="input"
+          />
+          <span id="compare-hint" className="mt-1 block text-xs text-muted">
+            اگر پر شود، محصول با درصد تخفیف و در «حراج» نمایش داده می‌شود.
+          </span>
+          <FieldError name="compare_price" label="قیمت قبل از تخفیف" />
         </label>
       </div>
       <fieldset className="space-y-3 rounded-xl border border-line p-3">
@@ -55,6 +74,29 @@ export function ProductForm({ product, variants = [] }: { product?: Product; var
             className="input"
           />
           <FieldError name="image" label="آدرس تصویر" />
+        </label>
+      </fieldset>
+      <fieldset className="space-y-3 rounded-xl border border-line p-3">
+        <legend className="px-1 text-sm">تصاویر بیشتر (گالری، حداکثر ۸)</legend>
+        {photos.length ? (
+          <ul className="flex flex-wrap gap-3">
+            {photos.map((p) => (
+              <li key={p.id}>
+                <label className="block cursor-pointer text-center text-xs text-muted has-checked:text-danger">
+                  <ProductImage src={p.path} alt="" className="size-20 rounded-lg" />
+                  <span className="mt-1 flex items-center justify-center gap-1">
+                    <input type="checkbox" name="remove_photo" value={p.id} />
+                    حذف
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <label className="block">
+          <span className="mb-1 block text-xs text-muted">افزودن تصویر (می‌توانید چند فایل را با هم انتخاب کنید؛ هر کدام حداکثر ۵ مگابایت)</span>
+          <input name="photos" type="file" multiple accept="image/jpeg,image/png,image/webp" data-check="image" className="input text-sm file:me-3 file:rounded-full file:border-0 file:bg-surface-2 file:px-3 file:py-1" />
+          <FieldError name="photos" label="تصاویر" />
         </label>
       </fieldset>
       <label className="block">

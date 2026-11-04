@@ -11,8 +11,14 @@ const Ctx = createContext<{ errors: Errors; recheck: (name: string) => void }>({
 // data-check="<name>": a rule shared with the server, which the HTML attributes can't express.
 const CHECKS: Record<string, (el: Field) => string | undefined> = {
   phone: (el) => (!el.value || normalizePhone(el.value) ? undefined : "شماره موبایل معتبر نیست (مثال: 09121234567)"),
-  // Same 5 MB as MAX_UPLOAD_BYTES (lib/uploads.ts, server-only). Bigger files would otherwise hit the request size limit.
-  image: (el) => (((el as HTMLInputElement).files?.[0]?.size ?? 0) > 5 * 1024 * 1024 ? "حجم تصویر باید حداکثر ۵ مگابایت باشد" : undefined),
+  // Same 5 MB per file as MAX_UPLOAD_BYTES (lib/uploads.ts, server-only), and 25 MB for all the form's photos together
+  // (next.config.ts allows 30 MB per request). Bigger files would otherwise hit the request size limit.
+  image: (el) => {
+    const files = [...((el as HTMLInputElement).files ?? [])];
+    if (files.some((f) => f.size > 5 * 1024 * 1024)) return "حجم هر تصویر باید حداکثر ۵ مگابایت باشد";
+    const all = [...(el.form?.querySelectorAll<HTMLInputElement>('input[type="file"]') ?? [])].flatMap((i) => [...(i.files ?? [])]);
+    if (all.reduce((sum, f) => sum + f.size, 0) > 25 * 1024 * 1024) return "حجم همه تصویرها با هم باید حداکثر ۲۵ مگابایت باشد";
+  },
 };
 
 function problem(el: Field): true | string | undefined {

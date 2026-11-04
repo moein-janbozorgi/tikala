@@ -3,16 +3,16 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { db, placeOrder, type CheckoutInfo } from "@/lib/db";
+import { cancelOrder, couponDiscount, db, placeOrder, transaction, type CheckoutInfo } from "@/lib/db";
 import { startPayment } from "@/lib/zarinpal";
 import { endOtherSessions, endSession, getUser, requireUser, startSession } from "@/lib/auth";
-import { getCart, setCart } from "@/lib/cart";
+import { getCart, getCartLines, getCouponCode, setCart, setCouponCode } from "@/lib/cart";
 import { clearFlash, setFlash } from "@/lib/flash";
 import { PROVINCES } from "@/lib/format";
 import { clearLoginFailures, hashPassword, loginLocked, passwordProblem, recordLoginFailure, verifyPassword } from "@/lib/password";
 import { checkCode, consumeCode, createCode, smsAllowedForIp } from "@/lib/otp";
 import { notifyOrder, sendLoginCode } from "@/lib/sms";
-import { emailProblem, errorParam, nameProblem, normalizePhone, normalizePostalCode, safeNext, toLatinDigits } from "@/lib/validation";
+import { emailProblem, errorParam, nameProblem, normalizeCoupon, normalizePhone, normalizePostalCode, safeNext, toLatinDigits } from "@/lib/validation";
 
 const str = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
 const fail = (path: string, message: string, key = "error"): never =>
@@ -79,15 +79,48 @@ export async function checkout(form: FormData) {
 
   let orderId = 0;
   try {
-    orderId = placeOrder(user.id, await getCart(), info, payment);
+    orderId = placeOrder(user.id, await getCart(), info, payment, await getCouponCode());
   } catch (e) {
     await reject(e instanceof Error ? e.message : "خطا در ثبت سفارش");
   }
   await setCart({});
+  await setCouponCode("");
   await clearFlash();
   if (payment === "online") await goToGateway(orderId); // its SMS goes out once the payment is verified
   after(() => notifyOrder(orderId, "placed"));
   redirect(`/account?order=${orderId}`);
+}
+
+/** Applies (or with the "remove" button, removes) a discount code in the cart, after checking it against the cart. */
+export async function applyCoupon(form: FormData) {
+  const code = form.has("remove") ? "" : normalizeCoupon(form.get("code"));
+  if (code) {
+    const subtotal = (await getCartLines()).reduce((sum, l) => sum + l.price * l.qty, 0);
+    const result = couponDiscount(code, subtotal);
+    if ("error" in result) fail("/cart", result.error);
+  }
+  await setCouponCode(code);
+  redirect("/cart");
+}
+
+/** The customer cancels their own order while nobody has acted on it yet; its items go back in stock. */
+export async function cancelMyOrder(form: FormData) {
+  const user = await requireUser("/account");
+  const orderId = Number(form.get("orderId"));
+  let problem = "";
+  transaction(() => {
+    const order = db.prepare("SELECT status, payment FROM orders WHERE id = ? AND user_id = ?").get(orderId, user.id) as
+      | { status: string; payment: string }
+      | undefined;
+    // Checked inside the transaction, so the admin can't start processing it in between.
+    if (!order) problem = "سفارش پیدا نشد";
+    // A paid online order would need a refund, which only the shop can do.
+    else if (order.status === "pending" && order.payment === "online") problem = "سفارش پرداخت‌شده را فقط فروشگاه می‌تواند لغو کند؛ با پشتیبانی تماس بگیرید";
+    else if (order.status !== "pending" && order.status !== "awaiting_payment") problem = "این سفارش دیگر قابل لغو نیست";
+    else cancelOrder(orderId);
+  });
+  if (problem) fail("/account", problem);
+  redirect("/account?cancelled=1");
 }
 
 /** Retry button for an online order whose payment failed or was abandoned. */

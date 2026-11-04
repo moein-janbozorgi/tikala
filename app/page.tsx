@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { db, type Product, type Variant } from "@/lib/db";
+import { percentOff, toman } from "@/lib/format";
 import { likeContains } from "@/lib/validation";
 import { addToCart } from "./actions";
 import { ErrorMessage } from "./error-message";
@@ -60,6 +61,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   // A type (subcategory, picked in the side menu) only means something inside its category, e.g. ?category=کفش&type=بوت.
   const type = category && typeof params.type === "string" ? params.type : undefined;
   const sort = typeof params.sort === "string" && params.sort in SORTS ? (params.sort as keyof typeof SORTS) : "new";
+  const sale = params.sale === "1";
   const categories = db
     .prepare("SELECT DISTINCT category FROM products WHERE active = 1 AND category != '' ORDER BY category")
     .all() as { category: string }[];
@@ -74,6 +76,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     where.push("subcategory = ?");
     args.push(type);
   }
+  if (sale) where.push("compare_price > price");
   if (q) {
     const like = likeContains(q);
     where.push("(name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR category LIKE ? ESCAPE '\\' OR subcategory LIKE ? ESCAPE '\\')");
@@ -96,7 +99,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   /** Link to this listing with some parameters changed, keeping the rest. */
   const link = (change: Record<string, string | number | undefined>) => {
     const next = new URLSearchParams();
-    for (const [k, v] of Object.entries({ category, type, q: q || undefined, sort: sort === "new" ? undefined : sort, page: undefined, ...change }))
+    for (const [k, v] of Object.entries({ category, type, q: q || undefined, sort: sort === "new" ? undefined : sort, sale: sale ? "1" : undefined, page: undefined, ...change }))
       if (v) next.set(k, String(v));
     return next.size ? `/?${next}` : "/";
   };
@@ -132,6 +135,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         {category ? <input type="hidden" name="category" value={category} /> : null}
         {type ? <input type="hidden" name="type" value={type} /> : null}
         {sort === "new" ? null : <input type="hidden" name="sort" value={sort} />}
+        {sale ? <input type="hidden" name="sale" value="1" /> : null}
         <SearchInput defaultValue={q} />
         <button className="btn shrink-0">جستجو</button>
       </form>
@@ -175,6 +179,14 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             {label}
           </Link>
         ))}
+        <Link
+          href={link({ sale: sale ? undefined : "1" })}
+          scroll={false}
+          aria-current={sale ? "true" : undefined}
+          className={`chip ms-auto gap-1 px-3 py-1 ${sale ? "border-danger bg-danger text-page" : "text-danger"}`}
+        >
+          حراج
+        </Link>
       </nav>
       {q ? (
         <p className="mb-4 text-sm text-muted">
@@ -205,6 +217,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                       {p.subcategory}
                     </span>
                   ) : null}
+                  {percentOff(p.price, p.compare_price) ? (
+                    <span className="absolute top-2.5 left-2.5 rounded-full bg-danger px-2.5 py-1 text-[11px] font-bold text-page">
+                      {`${percentOff(p.price, p.compare_price).toLocaleString("fa-IR")}٪ تخفیف`}
+                    </span>
+                  ) : null}
                   {variants.length ? null : (
                     <span className="absolute inset-x-0 bottom-0 bg-ink/75 py-1.5 text-center text-xs font-medium text-page backdrop-blur">ناموجود</span>
                   )}
@@ -215,9 +232,14 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                   <h2 className="mt-1 line-clamp-2 min-h-[2lh] text-sm leading-6 font-bold sm:text-base sm:leading-6">
                     {p.name}
                   </h2>
-                  <p className="mt-2 flex items-baseline gap-1">
+                  <p className="mt-2 flex flex-wrap items-baseline gap-x-1">
                     <span className="text-lg font-extrabold">{p.price.toLocaleString("fa-IR")}</span>
                     <span className="text-xs text-muted">تومان</span>
+                    {percentOff(p.price, p.compare_price) ? (
+                      <s className="ms-1 text-xs text-muted" aria-label={`قیمت قبل از تخفیف ${toman(p.compare_price)}`}>
+                        {p.compare_price.toLocaleString("fa-IR")}
+                      </s>
+                    ) : null}
                   </p>
                 </div>
               </Link>
