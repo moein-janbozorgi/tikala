@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { db } from "./db.ts";
 import { toLatinDigits } from "./phone.ts";
 import { EMAIL_PATTERN, NAME_PATTERN } from "./rules.ts";
 
@@ -32,12 +33,17 @@ export function safeNext(next: unknown) {
 
 // Error messages travel in the URL (?error=) so they survive redirects. They're signed, so nobody can send a link that
 // makes the shop show their own text ("your account is blocked, call…") in an official-looking alert.
-// shortcut: the key is random per server process (on globalThis so every bundle shares it), so a restart drops the
-// banner on old error links and several servers wouldn't share it; read it from an env secret if the shop ever scales out.
-const g = globalThis as { errorKey?: Buffer };
-const errorKey = (g.errorKey ??= randomBytes(32));
+// The key is made once and kept in the database, so error links still work after a restart (and every process agrees).
+let errorKey: Buffer | undefined;
+function key() {
+  if (!errorKey) {
+    db.prepare("INSERT OR IGNORE INTO settings (name, value) VALUES ('error_key', ?)").run(randomBytes(32).toString("hex"));
+    errorKey = Buffer.from((db.prepare("SELECT value FROM settings WHERE name = 'error_key'").get() as { value: string }).value, "hex");
+  }
+  return errorKey;
+}
 const SIG_LENGTH = 22; // base64url characters, ~128 bits
-const sign = (message: string) => createHmac("sha256", errorKey).update(message).digest("base64url").slice(0, SIG_LENGTH);
+const sign = (message: string) => createHmac("sha256", key()).update(message).digest("base64url").slice(0, SIG_LENGTH);
 
 /** URL-encoded value for ?error= that ErrorMessage will show. */
 export const errorParam = (message: string) => encodeURIComponent(`${sign(message)}.${message}`);

@@ -5,6 +5,7 @@ import { Lalezar, Vazirmatn } from "next/font/google";
 import { getUser } from "@/lib/auth";
 import { getCart } from "@/lib/cart";
 import { db } from "@/lib/db";
+import { SITE_URL } from "@/lib/format";
 import { logout, setTheme } from "./actions";
 import { BagIcon, MenuIcon, MoonIcon, SunIcon, SystemIcon, UserIcon } from "./icons";
 import { Footer } from "./footer";
@@ -17,8 +18,12 @@ const vazirmatn = Vazirmatn({ variable: "--font-vazirmatn", subsets: ["arabic", 
 const lalezar = Lalezar({ variable: "--font-lalezar", weight: "400", subsets: ["arabic", "latin"] });
 
 export const metadata: Metadata = {
+  // Lets relative image paths (product photos) become the absolute URLs link previews need.
+  metadataBase: new URL(SITE_URL),
   title: { default: "تیکلا", template: "%s | تیکلا" },
   description: "بوتیک تیکلا عرضه کننده انواع لباس و شلوار مد روز",
+  // Link previews on Telegram, WhatsApp, Instagram…; product pages add their name and photo.
+  openGraph: { siteName: "تیکلا", locale: "fa_IR", type: "website" },
 };
 
 // Every page shows the cart and login state from cookies, and products come from the database.

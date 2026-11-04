@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import sharp from "sharp";
 
 // Uploads live next to the database (data/uploads by default): outside public/, which `next start` only serves as it
 // was at build time, and covered by the same backup and .gitignore as the data.
@@ -18,15 +19,24 @@ export function detectImageType(bytes: Uint8Array): keyof typeof CONTENT_TYPES |
   return null;
 }
 
-/** Saves an uploaded product photo and returns its public path. Throws a Persian message if the file isn't acceptable. */
+/**
+ * Saves an uploaded product photo and returns its public path. Throws a Persian message if the file isn't acceptable.
+ * Phone photos are several MB; each is stored as WebP at most 1200×1500 (upright, metadata such as GPS dropped), so
+ * product pages stay light on mobile data.
+ */
 export async function saveUpload(file: File) {
   if (file.size > MAX_UPLOAD_BYTES) throw new Error("حجم تصویر باید حداکثر ۵ مگابایت باشد");
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const type = detectImageType(bytes);
-  if (!type) throw new Error("فقط تصویر JPG، PNG یا WEBP قابل بارگذاری است");
-  const name = `${randomUUID()}.${type}`;
+  if (!detectImageType(bytes)) throw new Error("فقط تصویر JPG، PNG یا WEBP قابل بارگذاری است");
+  let webp: Buffer;
+  try {
+    webp = await sharp(bytes).autoOrient().resize(1200, 1500, { fit: "inside", withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
+  } catch {
+    throw new Error("فایل تصویر خراب است یا خوانده نمی‌شود");
+  }
+  const name = `${randomUUID()}.webp`;
   await mkdir(UPLOAD_DIR, { recursive: true });
-  await writeFile(join(UPLOAD_DIR, name), bytes);
+  await writeFile(join(UPLOAD_DIR, name), webp);
   return `/uploads/${name}`;
 }
 

@@ -12,7 +12,15 @@ const getProduct = (id: string) => db.prepare("SELECT * FROM products WHERE id =
 
 export async function generateMetadata({ params }: PageProps<"/product/[id]">): Promise<Metadata> {
   const product = getProduct((await params).id);
-  return product ? { title: product.name, description: product.description } : {};
+  if (!product) return {};
+  const description = product.description.slice(0, 160) || `${product.name} — ${toman(product.price)}`;
+  return {
+    title: product.name,
+    description,
+    alternates: { canonical: `/product/${product.id}` },
+    // Nested metadata replaces the layout's openGraph object, so siteName and locale are repeated.
+    openGraph: { title: product.name, description, siteName: "تیکلا", locale: "fa_IR", images: product.image ? [product.image] : undefined },
+  };
 }
 
 export default async function ProductPage({ params, searchParams }: PageProps<"/product/[id]">) {

@@ -26,6 +26,13 @@ const CATEGORY_LOOK: Record<string, [() => React.ReactNode, string]> = {
 };
 const FALLBACK_COLORS = ["bg-violet-600", "bg-amber-500", "bg-cyan-600", "bg-fuchsia-600", "bg-blue-600"];
 
+// ?sort= value -> label and SQL order. Only these fixed strings ever reach the query.
+const SORTS = {
+  new: ["جدیدترین", "id DESC"],
+  cheap: ["ارزان‌ترین", "price ASC, id DESC"],
+  expensive: ["گران‌ترین", "price DESC, id DESC"],
+} as const;
+
 export default async function Home({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
   const category = typeof params.category === "string" ? params.category : undefined;
@@ -33,6 +40,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const q = typeof params.q === "string" ? params.q.trim().slice(0, 50).replace(/ي/g, "ی").replace(/ك/g, "ک") : "";
   // A type (subcategory, picked in the side menu) only means something inside its category, e.g. ?category=کفش&type=بوت.
   const type = category && typeof params.type === "string" ? params.type : undefined;
+  const sort = typeof params.sort === "string" && params.sort in SORTS ? (params.sort as keyof typeof SORTS) : "new";
   const categories = db
     .prepare("SELECT DISTINCT category FROM products WHERE active = 1 AND category != '' ORDER BY category")
     .all() as { category: string }[];
@@ -58,7 +66,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   // ?page=N shows the first N pages, so infinite scroll can grow the list and a reload or shared link keeps it.
   // shortcut: every scroll step re-renders the whole list, fine for a few hundred products; switch to fetching only the new page beyond that.
   const page = Math.min(pages, Math.max(1, Math.floor(Number(params.page)) || 1));
-  const products = db.prepare(`SELECT * FROM products WHERE ${filter} ORDER BY id DESC LIMIT ?`).all(...args, page * PAGE_SIZE) as Product[];
+  const products = db.prepare(`SELECT * FROM products WHERE ${filter} ORDER BY ${SORTS[sort][1]} LIMIT ?`).all(...args, page * PAGE_SIZE) as Product[];
   const ids = products.map((p) => p.id);
   const inStock = Map.groupBy(
     ids.length
@@ -69,7 +77,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   /** Link to this listing with some parameters changed, keeping the rest. */
   const link = (change: Record<string, string | number | undefined>) => {
     const next = new URLSearchParams();
-    for (const [k, v] of Object.entries({ category, type, q: q || undefined, page: undefined, ...change })) if (v) next.set(k, String(v));
+    for (const [k, v] of Object.entries({ category, type, q: q || undefined, sort: sort === "new" ? undefined : sort, page: undefined, ...change }))
+      if (v) next.set(k, String(v));
     return next.size ? `/?${next}` : "/";
   };
 
@@ -103,6 +112,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       <form action="/" role="search" className="mb-4 flex gap-2">
         {category ? <input type="hidden" name="category" value={category} /> : null}
         {type ? <input type="hidden" name="type" value={type} /> : null}
+        {sort === "new" ? null : <input type="hidden" name="sort" value={sort} />}
         <SearchInput defaultValue={q} />
         <button className="btn shrink-0">جستجو</button>
       </form>
@@ -133,6 +143,20 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         })}
       </nav>
 
+      <nav aria-label="مرتب‌سازی" className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-muted">مرتب‌سازی:</span>
+        {Object.entries(SORTS).map(([value, [label]]) => (
+          <Link
+            key={value}
+            href={link({ sort: value === "new" ? undefined : value })}
+            scroll={false}
+            aria-current={sort === value ? "true" : undefined}
+            className={`chip px-3 py-1 ${sort === value ? "chip-active" : ""}`}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
       {q ? (
         <p className="mb-4 text-sm text-muted">
           {total.toLocaleString("fa-IR")} نتیجه برای «{q}»{" "}

@@ -1,5 +1,6 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import { db } from "./db.ts";
 
 // Async so hashing (~50 ms) doesn't freeze the server for every other visitor.
 const scryptAsync = promisify(scrypt) as (password: string, salt: string, keylen: number) => Promise<Buffer>;
@@ -23,35 +24,27 @@ export async function verifyPassword(password: string, stored: string) {
   return timingSafeEqual(await scryptAsync(password, salt, 64), Buffer.from(hash, "hex"));
 }
 
-// shortcut: failed logins (and register attempts on taken emails) are kept in this server's memory, so a restart clears them and several servers wouldn't share
-// them; move them to the database if the shop ever runs on more than one server.
+// Failed logins (and register attempts on taken emails), kept in the database so a restart doesn't reset the lock.
 // Counted per email+IP (so a stranger can't lock someone else out of their account) and per IP (so one visitor can't try
-// many emails or passwords). Keys: "<email>\n<ip>" and "ip:<ip>".
-const failures = new Map<string, number[]>();
+// many emails or passwords).
 const LOCK_WINDOW = 15 * 60 * 1000;
 const MAX_PER_EMAIL_AND_IP = 5;
 const MAX_PER_IP = 20;
-const pairKey = (email: string, ip: string) => `${email}\n${ip}`;
-
-function recent(key: string, now: number) {
-  const times = (failures.get(key) ?? []).filter((t) => now - t < LOCK_WINDOW);
-  if (times.length) failures.set(key, times);
-  else failures.delete(key);
-  return times.length;
-}
+const count = (sql: string, ...args: (string | number)[]) => (db.prepare(`SELECT COUNT(*) AS n FROM login_failures WHERE ${sql}`).get(...args) as { n: number }).n;
 
 /** Login throttle: true after 5 failures for this email from this IP, or 20 from this IP, in the last 15 minutes. */
 export function loginLocked(email: string, ip: string, now = Date.now()) {
-  return recent(pairKey(email, ip), now) >= MAX_PER_EMAIL_AND_IP || recent(`ip:${ip}`, now) >= MAX_PER_IP;
+  const since = now - LOCK_WINDOW;
+  return count("email = ? AND ip = ? AND at > ?", email, ip, since) >= MAX_PER_EMAIL_AND_IP || count("ip = ? AND at > ?", ip, since) >= MAX_PER_IP;
 }
 
 export function recordLoginFailure(email: string, ip: string, now = Date.now()) {
-  // Drop expired entries now and then, so random emails can't grow the map forever.
-  if (failures.size > 10_000) for (const key of [...failures.keys()]) recent(key, now);
-  for (const key of [pairKey(email, ip), `ip:${ip}`]) failures.set(key, [...(failures.get(key) ?? []), now]);
+  // Expired rows are useless, so each new failure clears them; the table stays small.
+  db.prepare("DELETE FROM login_failures WHERE at <= ?").run(now - LOCK_WINDOW);
+  db.prepare("INSERT INTO login_failures (email, ip, at) VALUES (?, ?, ?)").run(email, ip, now);
 }
 
 /** After a successful login or a new password: unlock this email from every IP. */
 export function clearLoginFailures(email: string) {
-  for (const key of failures.keys()) if (key.startsWith(`${email}\n`)) failures.delete(key);
+  db.prepare("DELETE FROM login_failures WHERE email = ?").run(email);
 }

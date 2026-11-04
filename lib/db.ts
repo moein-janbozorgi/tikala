@@ -178,6 +178,21 @@ transaction(() => {
   `);
 });
 
+// v6: login lockout and the per-IP SMS limit move from server memory to the database, so a restart doesn't reset them,
+// and the key that signs ?error= messages is kept here, so a restart doesn't break error links.
+transaction(() => {
+  if (schemaVersion() >= 6) return;
+  db.exec(`
+    CREATE TABLE login_failures (email TEXT NOT NULL, ip TEXT NOT NULL, at INTEGER NOT NULL);
+    CREATE INDEX login_failures_email_ip ON login_failures (email, ip, at);
+    CREATE INDEX login_failures_ip ON login_failures (ip, at);
+    CREATE TABLE sms_ip_sends (ip TEXT NOT NULL, at INTEGER NOT NULL);
+    CREATE INDEX sms_ip_sends_ip ON sms_ip_sends (ip, at);
+    CREATE TABLE settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
+    PRAGMA user_version = 6;
+  `);
+});
+
 /** Parses admin input lines like "M | مشکی | 10" into variants. */
 export function parseVariants(text: string) {
   return text

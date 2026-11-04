@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getUser } from "@/lib/auth";
 import { getCartLines } from "@/lib/cart";
+import { db } from "@/lib/db";
 import { getFlash } from "@/lib/flash";
 import { NAME_PATTERN, NAME_RULE } from "@/lib/rules";
 import { FREE_SHIPPING_FROM, shippingCost, toman } from "@/lib/format";
@@ -18,7 +19,13 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
   const total = lines.reduce((sum, l) => sum + l.price * l.qty, 0);
   const shipping = shippingCost(total);
   // What the customer typed last time, if the server sent the form back with an error.
-  const typed = await getFlash("checkout");
+  // Otherwise the details of their last order, so a returning customer doesn't retype the address.
+  const last = user
+    ? (db.prepare("SELECT name, phone, province, city, postal_code, address FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 1").get(user.id) as
+        | Record<string, string>
+        | undefined)
+    : undefined;
+  const typed: Record<string, string | undefined> = { ...last, ...(await getFlash("checkout")) };
 
   if (lines.length === 0) {
     return (

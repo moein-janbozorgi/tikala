@@ -203,6 +203,17 @@ test("?error= banners show only messages the server signed", async () => {
   assert.equal(readErrorParam(value.replace("اشتباه", "مسدود")), null, "edited message rejected");
   assert.equal(readErrorParam("حساب شما مسدود شد؛ با ۰۹۱۲ تماس بگیرید"), null, "unsigned text rejected");
   assert.equal(readErrorParam(["a", "b"]), null);
+  const stored = db.prepare("SELECT value FROM settings WHERE name = 'error_key'").get() as { value: string } | undefined;
+  assert.match(stored?.value ?? "", /^[0-9a-f]{64}$/, "signing key kept in the database, so links survive a restart");
+});
+
+test("login lockout and the per-IP SMS limit are stored in the database", async () => {
+  const { smsAllowedForIp } = await import("../lib/otp.ts");
+  const t = Date.now();
+  recordLoginFailure("db@x.zz", "9.9.9.9", t);
+  smsAllowedForIp("9.9.9.9", t);
+  assert.ok(db.prepare("SELECT 1 FROM login_failures WHERE email = 'db@x.zz'").get());
+  assert.ok(db.prepare("SELECT 1 FROM sms_ip_sends WHERE ip = '9.9.9.9'").get());
 });
 
 test("?next= only allows same-site paths", async () => {

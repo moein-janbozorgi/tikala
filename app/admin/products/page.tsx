@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db, type Product } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { toman } from "@/lib/format";
+import { LOW_STOCK, toman } from "@/lib/format";
 import { likeContains } from "@/lib/validation";
 import { ErrorMessage } from "../../error-message";
 import { ProductImage } from "../../product-image";
@@ -14,6 +14,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q.trim().slice(0, 50) : "";
   const category = typeof params.category === "string" ? params.category : "";
+  const lowOnly = params.stock === "low";
   const categories = (db.prepare("SELECT name FROM categories ORDER BY name").all() as { name: string }[]).map((c) => c.name);
 
   const where = ["1"];
@@ -28,10 +29,12 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
   }
   const products = db
     .prepare(
-      `SELECT p.*, COALESCE(SUM(v.stock), 0) AS stock FROM products p LEFT JOIN variants v ON v.product_id = p.id
-       WHERE ${where.join(" AND ")} GROUP BY p.id ORDER BY p.id DESC`,
+      // low = how many of its size/colours are almost sold out (1 to LOW_STOCK left).
+      `SELECT p.*, COALESCE(SUM(v.stock), 0) AS stock, COALESCE(SUM(v.stock BETWEEN 1 AND ${LOW_STOCK}), 0) AS low
+       FROM products p LEFT JOIN variants v ON v.product_id = p.id
+       WHERE ${where.join(" AND ")} GROUP BY p.id ${lowOnly ? "HAVING low > 0" : ""} ORDER BY p.id DESC`,
     )
-    .all(...args) as (Product & { stock: number })[];
+    .all(...args) as (Product & { stock: number; low: number })[];
 
   return (
     <div className="space-y-5">
@@ -57,6 +60,10 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
           </select>
           <ChevronDownIcon className="pointer-events-none absolute inset-e-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
         </span>
+        <label className="chip has-checked:chip-active has-focus-visible:ring-2 has-focus-visible:ring-accent">
+          <input type="checkbox" name="stock" value="low" defaultChecked={lowOnly} className="sr-only" />
+          فقط کم‌موجودی
+        </label>
         <button className="btn-ghost">فیلتر</button>
       </form>
 
@@ -71,6 +78,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
                   {p.name}
                   {p.active ? null : <span className="badge tone-danger">مخفی</span>}
                   {p.stock === 0 ? <span className="badge tone-pending">ناموجود</span> : null}
+                  {p.low > 0 ? <span className="badge tone-pending">کم‌موجودی ({p.low.toLocaleString("fa-IR")})</span> : null}
                 </span>
                 <span className="mt-0.5 block text-xs text-muted">{[p.category || "بدون دسته‌بندی", p.subcategory].filter(Boolean).join(" › ")}</span>
               </span>

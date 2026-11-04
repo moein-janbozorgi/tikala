@@ -33,7 +33,7 @@ At checkout, customers choose online payment or cash on delivery. Online orders 
 |---|---|
 | `ZARINPAL_MERCHANT_ID` | Your 36-character merchant ID from the Zarinpal panel. Set it in production. |
 | `ZARINPAL_SANDBOX=1` | Use Zarinpal's test gateway (no real money). |
-| `SITE_URL` | Public address, e.g. `https://myshop.ir`. Zarinpal sends customers back to `SITE_URL/payment/callback`. Required behind a proxy. |
+| `SITE_URL` | Public address, e.g. `https://myshop.ir`. Zarinpal sends customers back to `SITE_URL/payment/callback`; `sitemap.xml`, `robots.txt` and link previews (product photo on Telegram/WhatsApp) use it for absolute links. Required in production. |
 
 - With `npm run dev` and no merchant ID, the sandbox is used automatically.
 - In production, online payment is refused until `ZARINPAL_MERCHANT_ID` is set (or `ZARINPAL_SANDBOX=1`). Cash on delivery still works.

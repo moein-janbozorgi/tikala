@@ -101,6 +101,10 @@ r = await submitForm("/cart", 'name="postal_code"', { name: "ابوالفضل م
 check(decodeURIComponent(r.location ?? "").includes("۳ تا ۱۵ حرف"), "checkout name over 15 letters rejected");
 r = await submitForm("/cart", 'name="postal_code"', { name: "تست", phone: "09121234567", province: "تهران", city: "تهران", postal_code: "1234567890", address: "تهران، خیابان آزادی", payment: "cod" });
 check(r.location?.startsWith("/account?order="), "checkout creates order");
+await submit("/product/1", 2, { variantId, qty: 1 });
+const refill = (await get("/cart")).html;
+check(refill.includes("تهران، خیابان آزادی") && refill.includes('value="1234567890"'), "next checkout is prefilled with the last order's address");
+await submitForm("/cart", `name="variantId" value="${variantId}"`, { variantId, qty: 0 });
 const account = (await get("/account")).html;
 check(account.includes("در انتظار بررسی"), "order visible in account");
 check(Object.keys(JSON.parse(decodeURIComponent(cookies.cart || "%7B%7D"))).length === 0, "cart cleared");
@@ -217,6 +221,15 @@ const offlinePage = await get("/offline.html");
 check(offlinePage.status === 200 && offlinePage.html.includes("اتصال به اینترنت برقرار نیست") && (await get("/sw.js")).html.includes("/offline.html"), "offline page and its service worker are served, not caught by the 404 redirect");
 check((await get("/no-such-page")).location === "/404" && (await get("/a/b/c")).location === "/404", "unknown addresses redirect to /404");
 check((await get("/product/1")).html.includes("<title>تی‌شرت نخی ساده | تیکلا</title>"), "product page title has product name");
+check(/<meta property="og:image" content="https?:\/\/[^"]+\/products\//.test((await get("/product/1")).html), "product page has an absolute link-preview image");
+const sitemap = await get("/sitemap.xml");
+check(sitemap.status === 200 && sitemap.html.includes("/product/1</loc>") && !sitemap.html.includes("/admin"), "sitemap lists products");
+check((await get("/robots.txt")).html.includes("Disallow: /admin") && (await get("/robots.txt")).html.includes("sitemap.xml"), "robots.txt hides private pages and points to the sitemap");
+
+// Sorting: the cheapest product on sale comes first.
+const { DatabaseSync: Db } = await import("node:sqlite");
+const cheapest = new Db(process.env.DB_PATH).prepare("SELECT id FROM products WHERE active = 1 ORDER BY price, id DESC LIMIT 1").get().id;
+check((await get("/?sort=cheap")).html.match(/href="\/product\/(\d+)"/)?.[1] === String(cheapest), "sort=cheap lists the cheapest product first");
 
 // Login lockout: 5 failures in 15 minutes, then locked (unknown emails count too).
 const lockEmail = `lock${Date.now()}@test.com`;
@@ -255,14 +268,18 @@ check(r.location?.startsWith("/account?order="), "Persian-digit phone and postal
 check((await get("/account")).html.includes("کاشان") && (await get("/admin")).html.includes("8715999999"), "order stores province, city and postal code");
 
 // ---------- Admin image upload (the e2e user is admin) ----------
-const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
+const { default: sharp } = await import("sharp");
+// A big phone-camera-sized photo: it must be stored shrunk, as WebP.
+const png = await sharp({ create: { width: 3000, height: 2000, channels: 3, background: "#c33" } }).png().toBuffer();
 const product = { name: "کلاه زمستانی", price: 300000, category: "اکسسوری", image: "", variants: "Free | مشکی | 2", active: "on" };
 r = await submitForm("/admin/products/new", 'name="imageFile"', { ...product, imageFile: new File(["<svg onload=alert(1)>"], "evil.png", { type: "image/png" }) });
 check(decodeURIComponent(r.location ?? "").includes("فقط تصویر"), "upload of a non-image is refused");
 r = await submitForm("/admin/products/new", 'name="imageFile"', { ...product, imageFile: new File([png], "hat.png", { type: "image/png" }) });
-const uploaded = (await get("/admin/products")).html.match(/src="(\/uploads\/[0-9a-f-]{36}\.png)"/)?.[1];
+const uploaded = (await get("/admin/products")).html.match(/src="(\/uploads\/[0-9a-f-]{36}\.webp)"/)?.[1];
 const served = uploaded ? await fetch(base + uploaded) : null;
-check(r.location === "/admin/products" && served?.status === 200 && served.headers.get("content-type") === "image/png", "uploaded PNG saved and served");
+const servedMeta = served?.ok ? await sharp(Buffer.from(await served.arrayBuffer())).metadata() : null;
+check(r.location === "/admin/products" && served?.headers.get("content-type") === "image/webp" && servedMeta?.width === 1200 && servedMeta?.height === 800, "uploaded photo stored as WebP, shrunk to 1200px wide");
+check((await get("/admin/products?stock=low")).html.includes("کلاه زمستانی") && (await get("/admin")).html.includes("کم‌موجودی"), "product with 2 left shows under the low-stock filter");
 check((await fetch(base + "/uploads/..%2Fshop.db")).status === 404, "upload route refuses other files");
 
 // ---------- Admin: categories, deleting products, order filters ----------

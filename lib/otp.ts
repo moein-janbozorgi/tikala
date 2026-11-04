@@ -48,16 +48,13 @@ export function checkCode(phone: string, code: string, now = Date.now()) {
   return timingSafeEqual(hash(phone, code), Buffer.from(saved.code_hash, "hex")) ? null : "کد وارد شده اشتباه است";
 }
 
-// shortcut: per-IP counts live in this server's memory, so a restart clears them and several servers wouldn't share
-// them; move them to the database if the shop ever runs on more than one server.
-const ipSends = new Map<string, number[]>();
-
-/** Records a code request from this IP; false once it has asked for 10 in the last hour. */
+/** Records a code request from this IP; false once it has asked for 10 in the last hour. Kept in the database, so a restart doesn't reset it. */
 export function smsAllowedForIp(ip: string, now = Date.now()) {
-  const recent = (ipSends.get(ip) ?? []).filter((t) => now - t < HOUR);
-  const allowed = recent.length < MAX_SENDS_PER_IP_PER_HOUR;
-  ipSends.set(ip, allowed ? [...recent, now] : recent);
-  return allowed;
+  db.prepare("DELETE FROM sms_ip_sends WHERE at <= ?").run(now - HOUR);
+  const { n } = db.prepare("SELECT COUNT(*) AS n FROM sms_ip_sends WHERE ip = ? AND at > ?").get(ip, now - HOUR) as { n: number };
+  if (n >= MAX_SENDS_PER_IP_PER_HOUR) return false;
+  db.prepare("INSERT INTO sms_ip_sends (ip, at) VALUES (?, ?)").run(ip, now);
+  return true;
 }
 
 /** Code accepted and acted on: delete it so it can't be used again. */
