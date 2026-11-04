@@ -197,7 +197,9 @@ const saved = new DatabaseSync(process.env.DB_PATH).prepare("SELECT name, email 
 check(saved?.name === "مریم\u200cالسادات احمدی", "name saved with spaces collapsed, email lowercased");
 
 // Persian 404 page and per-product titles.
-check((await get("/product/999")).html.includes("صفحه پیدا نشد") && (await get("/no-such-page")).html.includes("صفحه پیدا نشد"), "Persian 404 page");
+const page404 = await get("/404");
+check((await get("/product/999")).html.includes("صفحه پیدا نشد") && page404.status === 404 && page404.html.includes("صفحه پیدا نشد"), "Persian 404 page");
+check((await get("/no-such-page")).location === "/404" && (await get("/a/b/c")).location === "/404", "unknown addresses redirect to /404");
 check((await get("/product/1")).html.includes("<title>تی‌شرت نخی ساده | تیکلا</title>"), "product page title has product name");
 
 // Login lockout: 5 failures in 15 minutes, then locked (unknown emails count too).

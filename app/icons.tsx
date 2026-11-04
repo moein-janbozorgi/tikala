@@ -154,3 +154,14 @@ export const BagCheckArt = ({ className }: { className?: string }) => (
     </g>
   </svg>
 );
+/** The same bag with a question mark, for the 404 page. */
+export const BagQuestionArt = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" fill="none" stroke="var(--brand-ink)" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <g transform="rotate(8 50 55)">
+      <path d="M36 36v-7a14 14 0 0 1 28 0v7" />
+      <path d="M20 36h60l-5 50a6 6 0 0 1-6 5H31a6 6 0 0 1-6-5Z" fill="var(--brand)" />
+      <path d="M42 55a8 8 0 1 1 11 7.4c-2 .9-3 2.6-3 4.6v2" strokeWidth={7} />
+      <path d="M50 79h.01" strokeWidth={9} />
+    </g>
+  </svg>
+);
