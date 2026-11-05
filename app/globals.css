@@ -45,6 +45,19 @@ body {
   color: var(--ink);
 }
 
+/* Login-code modal (app/@auth/code-toast.tsx): the bar empties over 7s, the box fades out in the last 0.4s. */
+@keyframes toast-bar {
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

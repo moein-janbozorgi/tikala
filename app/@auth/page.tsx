@@ -9,6 +9,7 @@ import { CloseIcon } from "../icons";
 import { NAME_PATTERN, NAME_RULE, EMAIL_PATTERN } from "@/lib/rules";
 import { FieldError, ValidatedForm } from "../validated-form";
 import { CloseOnEscape } from "./close-on-escape";
+import { CodeToast } from "./code-toast";
 import { ResendButton } from "./resend-button";
 
 // The modal's own params; everything else in the URL belongs to the page under it.
@@ -195,8 +196,9 @@ async function Register({ hidden, error, loginHref }: ViewProps) {
   );
 }
 
-function Verify({ hidden, error, phone, purpose, loginHref }: ViewProps & { phone: string; purpose: "login" | "link" }) {
+async function Verify({ hidden, error, phone, purpose, loginHref }: ViewProps & { phone: string; purpose: "login" | "link" }) {
   const wait = phone ? resendWait(phone) : 0;
+  const otp = await getFlash("otp");
   const fields = (
     <>
       {hidden}
@@ -206,6 +208,7 @@ function Verify({ hidden, error, phone, purpose, loginHref }: ViewProps & { phon
   );
   return (
     <>
+      {otp.code && otp.phone === phone ? <CodeToast key={otp.code} code={otp.code} /> : null}
       <div>
         <h1 id="auth-title" className="text-2xl font-extrabold">کد تأیید</h1>
         <p className="mt-1 text-sm text-muted">

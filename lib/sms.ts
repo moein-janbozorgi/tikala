@@ -29,9 +29,15 @@ function toOutbox(phone: string, message: string) {
   appendFileSync(OUTBOX, `${new Date().toISOString()}\t${phone}\t${message}\n`);
 }
 
-/** Sends a login code through the verify template. Throws a Persian message if SMS isn't set up. */
+/**
+ * Sends a login code through the verify template. Throws a Persian message if SMS isn't set up.
+ * Returns true when the code only went to the outbox (no real SMS), so the site may show it on screen instead.
+ */
 export async function sendLoginCode(phone: string, code: string) {
-  if (consoleMode) return toOutbox(phone, `کد ورود تیکلا: ${code}`);
+  if (consoleMode) {
+    toOutbox(phone, `کد ورود تیکلا: ${code}`);
+    return true;
+  }
   if (!key) throw new Error("سرویس پیامک تنظیم نشده است");
   try {
     await kavenegar("verify/lookup", { receptor: phone, token: code, template: process.env.KAVENEGAR_OTP_TEMPLATE ?? "verify" });
@@ -39,6 +45,7 @@ export async function sendLoginCode(phone: string, code: string) {
     console.error(e);
     throw new Error("ارسال پیامک ناموفق بود؛ کمی بعد دوباره تلاش کنید");
   }
+  return false;
 }
 
 /** Order update by SMS. Best effort: a failed message is logged and never breaks the order. */

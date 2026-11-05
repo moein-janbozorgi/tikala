@@ -225,7 +225,9 @@ export async function requestCode(form: FormData) {
 
   let error = "";
   try {
-    await sendLoginCode(phone!, createCode(phone!));
+    const code = createCode(phone!);
+    // No real SMS (dev / SMS_CONSOLE=1): hand the code to the verify modal to show on screen.
+    if (await sendLoginCode(phone!, code)) await setFlash("otp", { phone: phone!, code });
   } catch (e) {
     error = e instanceof Error ? e.message : "ارسال کد ناموفق بود";
   }
