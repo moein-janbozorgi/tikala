@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { db, type Product, type Variant } from "@/lib/db";
+import { countSearch, db, type Product, type Variant } from "@/lib/db";
 import { percentOff, PRICE_STEP, toman } from "@/lib/format";
-import { likeContains, MAX_PRICE, toLatinDigits } from "@/lib/validation";
+import { likeContains, MAX_PRICE, toLatinDigits, toPersianDigits } from "@/lib/validation";
 import { addToCart } from "./actions";
 import { ErrorMessage } from "./error-message";
 import { FEATURES } from "./footer";
@@ -11,7 +11,6 @@ import { LoadMore } from "./load-more";
 import { PriceRange } from "./price-range";
 import { ProductImage } from "./product-image";
 import { QtyStepper } from "./qty-stepper";
-import { SearchInput } from "./search-input";
 
 const PAGE_SIZE = 12;
 
@@ -108,7 +107,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const filter = where.join(" AND ");
   const total = (db.prepare(`SELECT COUNT(*) AS n FROM products WHERE ${filter}`).get(...args) as { n: number }).n;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  // ?page=N shows the first N pages, so infinite scroll can grow the list and a reload or shared link keeps it.
+  // Feeds «جستجوهای پرطرفدار». Only searches that found something, so that list only ever shows text from the shop.
+  // shortcut: a reload counts again, so one visitor can lift a term; count once per session or IP if that gets abused.
+  if (q && total && !params.page) countSearch(q);  // ?page=N shows the first N pages, so infinite scroll can grow the list and a reload or shared link keeps it.
   // shortcut: every scroll step re-renders the whole list, fine for a few hundred products; switch to fetching only the new page beyond that.
   const page = Math.min(pages, Math.max(1, Math.floor(Number(params.page)) || 1));
   const products = db.prepare(`SELECT * FROM products WHERE ${filter} ORDER BY ${SORTS[sort][1]} LIMIT ?`).all(...args, page * PAGE_SIZE) as Product[];
@@ -154,17 +155,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           </div>
         </section>
       )}
-
-      <form action="/" role="search" className="mb-4 flex gap-2">
-        {category ? <input type="hidden" name="category" value={category} /> : null}
-        {type ? <input type="hidden" name="type" value={type} /> : null}
-        {sort === "new" ? null : <input type="hidden" name="sort" value={sort} />}
-        {sale ? <input type="hidden" name="sale" value="1" /> : null}
-        {min ? <input type="hidden" name="min" value={min} /> : null}
-        {max ? <input type="hidden" name="max" value={max} /> : null}
-        <SearchInput defaultValue={q} />
-        <button className="btn shrink-0">جستجو</button>
-      </form>
 
       <nav aria-label="دسته‌بندی‌ها" className="mb-6 flex justify-between gap-4 overflow-x-auto p-1 pb-2 sm:gap-6">
         {[{ category: "" }, ...categories].map((c, i) => {
@@ -299,7 +289,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                           className="chip min-h-8 px-2.5 py-1 text-xs has-checked:chip-active has-focus-visible:ring-2 has-focus-visible:ring-accent"
                         >
                           <input type="radio" name="variantId" value={v.id} defaultChecked={i === 0} required className="sr-only" />
-                          {v.size} · {v.color}
+                          {toPersianDigits(v.size)} · {v.color}
                         </label>
                       ))}
                     </div>

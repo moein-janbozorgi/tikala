@@ -3,6 +3,7 @@ import { getUser } from "@/lib/auth";
 import { getCartLines, getCouponCode } from "@/lib/cart";
 import { couponDiscount, db } from "@/lib/db";
 import { getFlash } from "@/lib/flash";
+import { toPersianDigits } from "@/lib/phone";
 import { NAME_PATTERN, NAME_RULE } from "@/lib/rules";
 import { FREE_SHIPPING_FROM, shippingCost, toman } from "@/lib/format";
 import { applyCoupon, checkout, updateCartItem } from "../actions";
@@ -66,7 +67,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
                     {l.name}
                   </Link>
                   <p className="text-sm text-muted">
-                    {l.size} · {l.color}
+                    {toPersianDigits(l.size)} · {l.color}
                   </p>
                   {l.qty > l.stock ? (
                     <p className="text-sm text-danger">فقط {l.stock.toLocaleString("fa-IR")} عدد موجود است</p>
@@ -165,8 +166,8 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
               <span className="mb-1.5 block text-sm font-medium">شماره موبایل</span>
               <input
                 name="phone"
-                defaultValue={typed.phone ?? user.phone ?? ""}
-                placeholder="09121234567"
+                defaultValue={toPersianDigits(typed.phone ?? user.phone ?? "")}
+                placeholder={toPersianDigits("09121234567")}
                 inputMode="tel"
                 autoComplete="tel"
                 dir="ltr"
@@ -198,7 +199,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
               <span className="mb-1.5 block text-sm font-medium">کد پستی (۱۰ رقم)</span>
               <input
                 name="postal_code"
-                defaultValue={typed.postal_code}
+                defaultValue={toPersianDigits(typed.postal_code ?? "")}
                 inputMode="numeric"
                 autoComplete="postal-code"
                 dir="ltr"

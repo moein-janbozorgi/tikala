@@ -432,3 +432,24 @@ transaction(() => {
   fillSizeGuide("عینک");
   db.exec("PRAGMA user_version = 9");
 });
+
+// v10: how often each search was made (only searches that found products), for «جستجوهای پرطرفدار» in the search box.
+transaction(() => {
+  if (schemaVersion() >= 10) return;
+  db.exec(`
+    CREATE TABLE search_counts (q TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0);
+    PRAGMA user_version = 10;
+  `);
+});
+
+/** Records a search that found products. The term is cut and spaces collapsed, so variants of one search add up. */
+export function countSearch(q: string) {
+  db.prepare("INSERT INTO search_counts (q, count) VALUES (?, 1) ON CONFLICT (q) DO UPDATE SET count = count + 1").run(q.trim().replace(/\s+/g, " ").slice(0, 50));
+}
+
+/** The 6 most-made searches; while there are fewer, product types (جین، کتانی…) fill the list. */
+export function popularSearches(): string[] {
+  const searched = (db.prepare("SELECT q FROM search_counts ORDER BY count DESC, q LIMIT 6").all() as { q: string }[]).map((r) => r.q);
+  const types = (db.prepare("SELECT subcategory AS q FROM products WHERE active = 1 AND subcategory != '' GROUP BY subcategory ORDER BY MAX(id) DESC LIMIT 6").all() as { q: string }[]).map((r) => r.q);
+  return [...new Set([...searched, ...types])].slice(0, 6);
+}

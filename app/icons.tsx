@@ -45,6 +45,18 @@ export const UserIcon = () => (
     <path d="M4 20a8 8 0 0 1 16 0" />
   </Icon>
 );
+export const SearchIcon = () => (
+  <Icon>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-4-4" />
+  </Icon>
+);
+export const TrendIcon = () => (
+  <Icon>
+    <path d="m3 17 6-6 4 4 8-8" />
+    <path d="M15 7h6v6" />
+  </Icon>
+);
 export const MenuIcon = () => (
   <Icon>
     <path d="M4 7h16M4 12h16M4 17h16" />

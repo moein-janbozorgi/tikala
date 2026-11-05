@@ -108,7 +108,7 @@ r = await submitForm("/cart", 'name="postal_code"', { name: "تست", phone: "09
 check(r.location?.startsWith("/account?order="), "checkout creates order");
 await submit("/product/1", 2, { variantId, qty: 1 });
 const refill = (await get("/cart")).html;
-check(refill.includes("تهران، خیابان آزادی") && refill.includes('value="1234567890"'), "next checkout is prefilled with the last order's address");
+check(refill.includes("تهران، خیابان آزادی") && refill.includes('value="۱۲۳۴۵۶۷۸۹۰"'), "next checkout is prefilled with the last order's address");
 await submitForm("/cart", `name="variantId" value="${variantId}"`, { variantId, qty: 0 });
 const account = (await get("/account")).html;
 check(account.includes("در انتظار بررسی"), "order visible in account");
@@ -278,7 +278,7 @@ const cartAfterError = (await get("/cart")).html;
 check(decodeURIComponent(r.location ?? "").includes("کد پستی") && cartAfterError.includes('value="کاشان"') && cartAfterError.includes("خیابان امیرکبیر، کوچه ۵"), "bad postal code rejected, typed address kept");
 r = await submitForm("/cart", 'name="postal_code"', { name: "تست", phone: "۰۹۱۲۱۲۳۴۵۶۷", province: "اصفهان", city: "کاشان", postal_code: "۸۷۱۵۹-۹۹۹۹۹", address: "خیابان امیرکبیر، کوچه ۵", payment: "cod" });
 check(r.location?.startsWith("/account?order="), "Persian-digit phone and postal code accepted");
-check((await get("/account")).html.includes("کاشان") && (await get("/admin")).html.includes("8715999999"), "order stores province, city and postal code");
+check((await get("/account")).html.includes("کاشان") && (await get("/admin")).html.includes("۸۷۱۵۹۹۹۹۹۹"), "order stores province, city and postal code");
 
 // ---------- Admin image upload (the e2e user is admin) ----------
 const { default: sharp } = await import("sharp");
@@ -341,11 +341,11 @@ const shipId = (await codCheckout()).location.match(/order=(\d+)/)[1];
 // admin forms: 0 logout, 1 theme, 2 = status form of the newest order (this one)
 r = await submit("/admin", 2, { id: shipId, status: "shipped", tracking_code: "rr 123456789 ir", back: "/admin" });
 await new Promise((res) => setTimeout(res, 300)); // the SMS goes out just after the response
-check(r.location === "/admin" && outbox().includes("کد رهگیری مرسوله: RR123456789IR") && (await get("/account")).html.includes("RR123456789IR"), "tracking code saved with 'shipped', sent in the SMS and shown to the customer");
+check(r.location === "/admin" && outbox().includes("کد رهگیری مرسوله: RR123456789IR") && (await get("/account")).html.includes("RR۱۲۳۴۵۶۷۸۹IR"), "tracking code saved with 'shipped', sent in the SMS and shown to the customer");
 r = await submit("/admin", 2, { id: shipId, status: "shipped", tracking_code: "bad!", back: "/admin" });
 check(decodeURIComponent(r.location ?? "").includes("کد رهگیری باید"), "malformed tracking code rejected");
 const invoice = await get(`/admin/orders/${shipId}/invoice`);
-check(invoice.status === 200 && invoice.html.includes("فاکتور فروش") && invoice.html.includes("تی‌شرت نخی ساده") && invoice.html.includes("RR123456789IR"), "printable invoice lists the order");
+check(invoice.status === 200 && invoice.html.includes("فاکتور فروش") && invoice.html.includes("تی‌شرت نخی ساده") && invoice.html.includes("RR۱۲۳۴۵۶۷۸۹IR"), "printable invoice lists the order");
 check((await guest(() => get(`/admin/orders/${shipId}/invoice`))).status !== 200, "invoice is admin-only");
 
 // ---------- Sale price, gallery, size guide, related products ----------

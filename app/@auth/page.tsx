@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getUser } from "@/lib/auth";
 import { getFlash } from "@/lib/flash";
 import { resendWait } from "@/lib/otp";
-import { normalizePhone, safeNext } from "@/lib/validation";
+import { normalizePhone, safeNext, toPersianDigits } from "@/lib/validation";
 import { login, register, requestCode, verifyCode } from "../actions";
 import { ErrorMessage } from "../error-message";
 import { CloseIcon } from "../icons";
@@ -63,7 +63,7 @@ export default async function AuthModal({ params, searchParams }: Props) {
               <input type="hidden" name="purpose" value="login" />
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium">شماره موبایل</span>
-                <input name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" placeholder="09121234567" required data-check="phone" className="input text-right" />
+                <input name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" placeholder={toPersianDigits("09121234567")} required data-check="phone" className="input text-right" />
                 <FieldError name="phone" label="شماره موبایل" />
               </label>
               <button className="btn w-full">دریافت کد ورود</button>
@@ -212,7 +212,7 @@ async function Verify({ hidden, error, phone, purpose, loginHref }: ViewProps & 
       <div>
         <h1 id="auth-title" className="text-2xl font-extrabold">کد تأیید</h1>
         <p className="mt-1 text-sm text-muted">
-          کد ۶ رقمی ارسال‌شده به <span dir="ltr">{phone}</span> را وارد کنید.
+          کد ۶ رقمی ارسال‌شده به <span dir="ltr">{toPersianDigits(phone)}</span> را وارد کنید.
         </p>
       </div>
       <ErrorMessage error={error} />

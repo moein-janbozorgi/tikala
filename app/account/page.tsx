@@ -1,5 +1,6 @@
 import { db, expireUnpaidOrders } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { toPersianDigits } from "@/lib/phone";
 import { cancelMyOrder, payOrder, requestCode, setPassword } from "../actions";
 import { ConfirmButton } from "../admin/confirm-button";
 import { ErrorMessage } from "../error-message";
@@ -52,14 +53,14 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
           <p className="text-sm text-muted">
             {user.phone ? (
               <>
-                شماره فعلی: <span dir="ltr">{user.phone}</span>. با آن می‌توانید با کد پیامکی وارد شوید.
+                شماره فعلی: <span dir="ltr">{toPersianDigits(user.phone)}</span>. با آن می‌توانید با کد پیامکی وارد شوید.
               </>
             ) : (
               "شماره‌ای ثبت نشده است. با افزودن شماره، اگر رمز عبور را فراموش کنید هم می‌توانید وارد شوید."
             )}
           </p>
           <div>
-            <input name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" placeholder="09121234567" required data-check="phone" aria-label="شماره موبایل" className="input text-right" />
+            <input name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" placeholder={toPersianDigits("09121234567")} required data-check="phone" aria-label="شماره موبایل" className="input text-right" />
             <FieldError name="phone" label="شماره موبایل" />
           </div>
           <button className="btn-ghost">{user.phone ? "تغییر شماره" : "افزودن شماره"}</button>

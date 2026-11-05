@@ -115,7 +115,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
                   name="tracking_code"
                   defaultValue={o.tracking_code}
                   placeholder="کد رهگیری مرسوله"
-                  aria-label={`کد رهگیری مرسوله سفارش ${o.id}`}
+                  aria-label={`کد رهگیری مرسوله سفارش ${o.id.toLocaleString("fa-IR")}`}
                   dir="ltr"
                   maxLength={30}
                   className="input w-56 py-1.5 text-base sm:text-sm"

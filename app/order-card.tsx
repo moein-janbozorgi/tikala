@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { date, ORDER_STATUSES, toman } from "@/lib/format";
+import { toPersianDigits } from "@/lib/phone";
 
 export type Order = {
   id: number;
@@ -35,7 +36,7 @@ export function OrderCard({ order, children }: { order: Order; children?: React.
       <ul className="space-y-1 text-sm text-muted">
         {items.map((i) => (
           <li key={i.id}>
-            {i.product_name} ({i.size} / {i.color}) × {i.qty.toLocaleString("fa-IR")} — {toman(i.price * i.qty)}
+            {i.product_name} ({toPersianDigits(i.size)} / {i.color}) × {i.qty.toLocaleString("fa-IR")} — {toman(i.price * i.qty)}
           </li>
         ))}
       </ul>
@@ -44,7 +45,7 @@ export function OrderCard({ order, children }: { order: Order; children?: React.
         {order.ref_id ? (
           <>
             {" "}
-            · کد پیگیری: <span dir="ltr">{order.ref_id}</span>
+            · کد پیگیری: <span dir="ltr">{toPersianDigits(order.ref_id)}</span>
           </>
         ) : null}
         {order.discount ? (
@@ -58,7 +59,7 @@ export function OrderCard({ order, children }: { order: Order; children?: React.
         <p className="text-sm">
           کد رهگیری مرسوله:{" "}
           <span dir="ltr" className="font-bold select-all">
-            {order.tracking_code}
+            {toPersianDigits(order.tracking_code)}
           </span>{" "}
           <a href="https://tracking.post.ir/" target="_blank" rel="noreferrer" className="text-accent hover:underline">
             رهگیری در سایت پست
@@ -66,11 +67,11 @@ export function OrderCard({ order, children }: { order: Order; children?: React.
         </p>
       ) : null}
       <p className="border-t border-line pt-3 text-sm">
-        {order.name} — <span dir="ltr">{order.phone}</span> — {[order.province, order.city, order.address].filter(Boolean).join("، ")}
+        {order.name} — <span dir="ltr">{toPersianDigits(order.phone)}</span> — {[order.province, order.city, order.address].filter(Boolean).join("، ")}
         {order.postal_code ? (
           <>
             {" "}
-            — کد پستی <span dir="ltr">{order.postal_code}</span>
+            — کد پستی <span dir="ltr">{toPersianDigits(order.postal_code)}</span>
           </>
         ) : null}
       </p>

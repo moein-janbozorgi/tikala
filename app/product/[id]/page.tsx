@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db, type Product, type Variant } from "@/lib/db";
 import { percentOff, SITE_URL, toman } from "@/lib/format";
+import { toPersianDigits } from "@/lib/phone";
 import { addToCart } from "../../actions";
 import { ErrorMessage } from "../../error-message";
 import { ProductImage } from "../../product-image";
@@ -140,7 +141,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
                       required
                       className="sr-only"
                     />
-                    {v.size} · {v.color}
+                    {toPersianDigits(v.size)} · {v.color}
                   </label>
                 ))}
               </div>
@@ -199,7 +200,7 @@ function SizeGuide({ text }: { text: string }) {
               <tr className="border-b border-line">
                 {rows[0].map((c, i) => (
                   <th key={i} className="px-2 py-2 font-bold">
-                    {c}
+                    {toPersianDigits(c)}
                   </th>
                 ))}
               </tr>
@@ -209,7 +210,7 @@ function SizeGuide({ text }: { text: string }) {
                 <tr key={i} className="border-b border-line last:border-0">
                   {r.map((c, j) => (
                     <td key={j} className="px-2 py-2">
-                      {c}
+                      {toPersianDigits(c)}
                     </td>
                   ))}
                 </tr>
@@ -220,7 +221,7 @@ function SizeGuide({ text }: { text: string }) {
       ) : null}
       {notes.map((n, i) => (
         <p key={i} className="mt-2 text-sm text-muted">
-          {n}
+          {toPersianDigits(n)}
         </p>
       ))}
     </details>

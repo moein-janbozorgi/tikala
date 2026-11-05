@@ -4,12 +4,15 @@ import { cookies } from "next/headers";
 import { Lalezar, Vazirmatn } from "next/font/google";
 import { getUser } from "@/lib/auth";
 import { getCart } from "@/lib/cart";
-import { db } from "@/lib/db";
+import { db, popularSearches } from "@/lib/db";
 import { SITE_URL } from "@/lib/format";
 import { logout, setTheme } from "./actions";
-import { BagIcon, MenuIcon, MoonIcon, SunIcon, SystemIcon, UserIcon } from "./icons";
+import { Suspense } from "react";
+import { BagIcon, MenuIcon, MoonIcon, SearchIcon, SunIcon, SystemIcon, UserIcon } from "./icons";
 import { Footer } from "./footer";
 import { OfflineScreen } from "./offline-screen";
+import { LoginLink } from "./login-link";
+import { SearchBox } from "./search-input";
 import { SideMenu } from "./side-menu";
 import "./globals.css";
 
@@ -49,7 +52,6 @@ export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
     if (categories.at(-1)?.category !== r.category) categories.push({ category: r.category, types: [] });
     if (r.subcategory) categories.at(-1)!.types.push(r.subcategory);
   }
-
   return (
     <html lang="fa" dir="rtl" data-theme={theme === "system" ? undefined : theme} className={`${vazirmatn.variable} ${lalezar.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
@@ -61,7 +63,18 @@ export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
             <Link href="/" className="flex items-center gap-2 font-display text-2xl">
               تیکلا
             </Link>
-            <div className="ms-auto flex items-center gap-1 text-sm sm:gap-2">
+            {/* Looks like a search field; opens the search box (app/search-input.tsx) over it to type in. */}
+            <button
+              id="search-trigger"
+              popoverTarget="search-box"
+              aria-label="جستجوی محصول"
+              // No focus outline (focus comes back here whenever the box closes); keyboard focus shows as a tint instead.
+              className="ms-auto flex size-10 items-center justify-center gap-2 rounded-full text-sm text-muted transition hover:bg-surface-2 hover:text-ink focus-visible:bg-surface-2 focus-visible:outline-none! sm:ms-4 sm:h-10 sm:w-full sm:max-w-xs sm:justify-start sm:rounded-xl sm:border sm:border-line sm:bg-surface sm:px-3.5 sm:hover:bg-surface-2 sm:focus-visible:bg-surface-2"
+            >
+              <SearchIcon />
+              <span className="hidden sm:inline">جستجوی محصول…</span>
+            </button>
+            <div className="flex items-center gap-1 text-sm sm:ms-auto sm:gap-2">
               {user?.is_admin ? (
                 <Link href="/admin" className="rounded-full px-3 py-2 hover:bg-surface-2">
                   مدیریت
@@ -78,10 +91,16 @@ export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
                   </form>
                 </>
               ) : (
-                // Query-only href: opens the login modal over the current page.
-                <Link href="?auth=login" scroll={false} className="rounded-full px-3 py-2 hover:bg-surface-2">
-                  ورود / ثبت‌نام
-                </Link>
+                // Fallback (query-only href) still opens the modal over the current page, just without its other params.
+                <Suspense
+                  fallback={
+                    <Link href="?auth=login" scroll={false} className="rounded-full px-3 py-2 hover:bg-surface-2">
+                      ورود / ثبت‌نام
+                    </Link>
+                  }
+                >
+                  <LoginLink className="rounded-full px-3 py-2 hover:bg-surface-2" />
+                </Suspense>
               )}
               <form action={setTheme}>
                 <button
@@ -107,6 +126,9 @@ export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
           </nav>
         </header>
         <SideMenu categories={categories} />
+        <Suspense>
+          <SearchBox categories={categories} popular={popularSearches()} />
+        </Suspense>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:py-8">{children}</main>
         <Footer categories={categories} />
         {auth}

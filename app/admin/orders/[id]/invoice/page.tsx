@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { date, toman } from "@/lib/format";
+import { toPersianDigits } from "@/lib/phone";
 import type { Order } from "../../../../order-card";
 import { PrintButton } from "./print-button";
 
@@ -37,12 +38,12 @@ export default async function InvoicePage({ params }: PageProps<"/admin/orders/[
       <section className="space-y-1">
         <h2 className="font-bold">گیرنده</h2>
         <p>
-          {order.name} — <span dir="ltr">{order.phone}</span>
+          {order.name} — <span dir="ltr">{toPersianDigits(order.phone)}</span>
         </p>
         <p>{[order.province, order.city, order.address].filter(Boolean).join("، ")}</p>
         {order.postal_code ? (
           <p>
-            کد پستی: <span dir="ltr">{order.postal_code}</span>
+            کد پستی: <span dir="ltr">{toPersianDigits(order.postal_code)}</span>
           </p>
         ) : null}
       </section>
@@ -62,7 +63,7 @@ export default async function InvoicePage({ params }: PageProps<"/admin/orders/[
             <tr key={i.id}>
               <td className={cell}>{i.product_name}</td>
               <td className={cell}>
-                {i.size} / {i.color}
+                {toPersianDigits(i.size)} / {i.color}
               </td>
               <td className={cell}>{i.qty.toLocaleString("fa-IR")}</td>
               <td className={cell}>{toman(i.price)}</td>
@@ -94,13 +95,13 @@ export default async function InvoicePage({ params }: PageProps<"/admin/orders/[
         {order.ref_id ? (
           <>
             {" "}
-            · کد پیگیری پرداخت: <span dir="ltr">{order.ref_id}</span>
+            · کد پیگیری پرداخت: <span dir="ltr">{toPersianDigits(order.ref_id)}</span>
           </>
         ) : null}
         {order.tracking_code ? (
           <>
             {" "}
-            · کد رهگیری مرسوله: <span dir="ltr">{order.tracking_code}</span>
+            · کد رهگیری مرسوله: <span dir="ltr">{toPersianDigits(order.tracking_code)}</span>
           </>
         ) : null}
       </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toPersianDigits } from "@/lib/phone";
 import { CloseIcon } from "../icons";
 
 /** Shows the login code at the top of the page for 7 seconds; used only when SMS isn't really sent (see sendLoginCode). */
@@ -25,7 +26,7 @@ export function CodeToast({ code }: { code: string }) {
         </button>
         <p id="code-toast" className="font-medium">کد ورود شما:</p>
         <p dir="ltr" className="mt-2 text-3xl font-extrabold tracking-[0.3em] select-all">
-          {code}
+          {toPersianDigits(code)}
         </p>
         {/* Time left: shrinks from full width to nothing over the 7 seconds. */}
         <div aria-hidden className="absolute inset-x-0 bottom-0 h-1 origin-right bg-brand animate-[toast-bar_7s_linear_forwards]" />

@@ -4,7 +4,7 @@ import { toLatinDigits } from "./phone.ts";
 import { EMAIL_PATTERN, NAME_PATTERN } from "./rules.ts";
 
 // In their own file so client forms can use them without pulling in node:crypto.
-export { normalizePhone, toLatinDigits } from "./phone.ts";
+export { normalizePhone, toLatinDigits, toPersianDigits } from "./phone.ts";
 
 // Register-form rules besides the password (see passwordProblem). The form mirrors them in `pattern`.
 // Each returns a Persian error, or null if the value is acceptable.

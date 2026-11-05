@@ -154,8 +154,10 @@ test("uploads are recognized by their bytes, not their name", async () => {
 });
 
 test("phones and postal codes accept Persian digits and common prefixes", async () => {
-  const { normalizePhone, normalizePostalCode, toLatinDigits } = await import("../lib/validation.ts");
+  const { normalizePhone, normalizePostalCode, toLatinDigits, toPersianDigits } = await import("../lib/validation.ts");
   assert.equal(toLatinDigits("۰۹۱۲ ٣٤٥"), "0912 345");
+  assert.equal(toPersianDigits("کد 0912-345"), "کد ۰۹۱۲-۳۴۵");
+  assert.equal(toLatinDigits(toPersianDigits(1234567890)), "1234567890");
   for (const ok of ["09121234567", "۰۹۱۲۱۲۳۴۵۶۷", "+989121234567", "00989121234567", "0912-123-4567"]) assert.equal(normalizePhone(ok), "09121234567", ok);
   for (const bad of ["9121234567", "0812123456", "0912123456", "091212345678", "abc"]) assert.equal(normalizePhone(bad), null, bad);
   assert.equal(normalizePostalCode("۱۲۳۴۵-۶۷۸۹۰"), "1234567890");
@@ -356,4 +358,17 @@ test("every starter category gets a size guide listing each size its products us
     const used = db.prepare("SELECT DISTINCT v.size FROM variants v JOIN products p ON p.id = v.product_id WHERE p.category = ?").all(c.name) as { size: string }[];
     for (const { size } of used) assert.ok(listed.has(size), `${c.name}: size ${size} missing from its guide`);
   }
+});
+
+test("popular searches: most-made first, spaces collapsed, product types fill the rest", async () => {
+  const { countSearch, popularSearches } = await import("../lib/db.ts");
+  const before = popularSearches();
+  assert.equal(before.length, 6); // sample products alone fill the list with types
+  countSearch("هودی");
+  countSearch("کفش  چرم");
+  countSearch(" کفش چرم ");
+  const list = popularSearches();
+  assert.deepEqual(list.slice(0, 2), ["کفش چرم", "هودی"]);
+  assert.equal(list.length, 6);
+  assert.equal(new Set(list).size, 6);
 });

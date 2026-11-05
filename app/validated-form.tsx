@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useRef, useState } from "react";
-import { normalizePhone } from "@/lib/phone";
+import { normalizePhone, toPersianDigits } from "@/lib/phone";
 
 type Field = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 // Per field name: true = left empty, a string = a ready message for any other problem.
@@ -10,7 +10,7 @@ const Ctx = createContext<{ errors: Errors; recheck: (name: string) => void }>({
 
 // data-check="<name>": a rule shared with the server, which the HTML attributes can't express.
 const CHECKS: Record<string, (el: Field) => string | undefined> = {
-  phone: (el) => (!el.value || normalizePhone(el.value) ? undefined : "شماره موبایل معتبر نیست (مثال: 09121234567)"),
+  phone: (el) => (!el.value || normalizePhone(el.value) ? undefined : "شماره موبایل معتبر نیست (مثال: ۰۹۱۲۱۲۳۴۵۶۷)"),
   // Same 5 MB per file as MAX_UPLOAD_BYTES (lib/uploads.ts, server-only), and 25 MB for all the form's photos together
   // (next.config.ts allows 30 MB per request). Bigger files would otherwise hit the request size limit.
   image: (el) => {
@@ -84,7 +84,14 @@ export function ValidatedForm({ children, ...props }: React.ComponentProps<"form
         }
       }}
       onInput={(e) => {
-        const { name } = e.target as Field;
+        const el = e.target as Field;
+        // Phone, postal-code and SMS-code fields show digits typed on an English keyboard in Persian; the server reads both.
+        if (el instanceof HTMLInputElement && (el.inputMode === "tel" || el.inputMode === "numeric") && /[0-9]/.test(el.value)) {
+          const { selectionStart, selectionEnd } = el;
+          el.value = toPersianDigits(el.value); // same length, so the caret can be put back where it was
+          el.setSelectionRange(selectionStart, selectionEnd);
+        }
+        const { name } = el;
         recheck(name);
         // Editing a password also re-judges its confirmation.
         e.currentTarget.querySelectorAll<Field>(`[data-match="${name}"]`).forEach((el) => recheck(el.name));

@@ -68,7 +68,7 @@ export async function checkout(form: FormData) {
   const postalCode = normalizePostalCode(typed.postal_code);
   const nameError = nameProblem(typed.name.replace(/\s+/g, " "));
   if (nameError) await reject(`نام گیرنده: ${nameError}`);
-  if (!phone) await reject("شماره موبایل معتبر نیست (مثال: 09121234567)");
+  if (!phone) await reject("شماره موبایل معتبر نیست (مثال: ۰۹۱۲۱۲۳۴۵۶۷)");
   if (!PROVINCES.includes(typed.province)) await reject("استان را انتخاب کنید");
   if (typed.city.length < 2 || typed.city.length > 40) await reject("نام شهر را وارد کنید");
   if (!postalCode) await reject("کد پستی باید ۱۰ رقم باشد");
@@ -219,7 +219,7 @@ export async function requestCode(form: FormData) {
   // Linking reports errors on the account page itself; login in the modal.
   const reject = (message: string) => (purpose === "link" ? fail(from, message) : authFail(authUrl(from, { auth: "login", next }), message));
   const phone = normalizePhone(str(form, "phone"));
-  if (!phone) reject("شماره موبایل معتبر نیست (مثال: 09121234567)");
+  if (!phone) reject("شماره موبایل معتبر نیست (مثال: ۰۹۱۲۱۲۳۴۵۶۷)");
   if (purpose === "link" && db.prepare("SELECT 1 FROM users WHERE phone = ?").get(phone)) reject("این شماره برای حساب دیگری ثبت شده است");
   if (!smsAllowedForIp(await clientIp())) reject("تعداد درخواست کد از این دستگاه بیش از حد مجاز است؛ یک ساعت دیگر تلاش کنید");
 
