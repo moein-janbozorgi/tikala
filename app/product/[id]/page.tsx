@@ -35,16 +35,17 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
     ...(db.prepare("SELECT path, color FROM product_images WHERE product_id = ? ORDER BY id").all(product.id) as { path: string; color: string }[]),
   ].filter((p) => p.path);
   const photos = gallery.map((p) => p.path);
-  // Colors by index (CSS-safe). Picking a size/color chip shows that color's photos first and hides other colors' photos;
-  // photos with no color always show. Plain CSS (:has), like the rest of the gallery, so no JavaScript needed.
+  // Colors by index (CSS-safe). Picking a color shows only its photos, or only the untagged photos (data-pc="") when it
+  // has none. Each color gets its own set, so the slide the gallery is snapped to always belongs to the picked color
+  // (with photos merely reordered, scroll-snap kept the old slide in view). Plain CSS (:has), so no JavaScript needed.
   const colors = [...new Set(variants.map((v) => v.color))];
-  const colorOf = (color: string) => (colors.includes(color) ? colors.indexOf(color) : undefined);
+  const colorOf = (color: string) => (colors.includes(color) ? String(colors.indexOf(color)) : "");
+  const untagged = gallery.some((p) => colorOf(p.color) === "");
   const colorCss = colors
-    .map((c, k) =>
-      gallery.some((p) => p.color === c)
-        ? `#product:has([data-c="${k}"]:checked) [data-pc]:not([data-pc="${k}"]){display:none}#product:has([data-c="${k}"]:checked) [data-pc="${k}"]{order:-1}`
-        : "",
-    )
+    .map((c, k) => {
+      const shown = gallery.some((p) => p.color === c) ? String(k) : untagged ? "" : null;
+      return shown === null ? "" : `#product:has([data-c="${k}"]:checked) [data-pc]:not([data-pc="${shown}"]){display:none}`;
+    })
     .join("");
   // Sizes missing or sold out in the picked color are crossed out (same CSS-only approach).
   const sizes = [...new Set(variants.map((v) => v.size))];
