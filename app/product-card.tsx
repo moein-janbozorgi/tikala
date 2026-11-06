@@ -4,7 +4,6 @@ import type { ProductWithStock } from "@/lib/products";
 import { addToCart } from "./actions";
 import { BagIcon } from "./icons";
 import { ProductImage } from "./product-image";
-import { QtyStepper } from "./qty-stepper";
 
 /** A product in the shop grid, with a buy button (sizes and colors are picked on the product page). Rendered by the home page and by LoadMore. */
 export function ProductCard({ product: p }: { product: ProductWithStock }) {
@@ -32,7 +31,7 @@ export function ProductCard({ product: p }: { product: ProductWithStock }) {
             <span className="absolute inset-x-0 bottom-0 bg-ink/75 py-1.5 text-center text-xs font-medium text-page backdrop-blur">ناموجود</span>
           )}
         </div>
-        <div className="px-1.5 pt-3">
+        <div className="px-1.5 pt-3 pb-3">
           <p className="text-[11px] text-muted">{p.category}</p>
           {/* Two lines kept even for short names, so prices and buttons line up across a row. */}
           <h2 className="mt-1 line-clamp-2 min-h-[2lh] text-sm leading-6 font-bold sm:text-base sm:leading-6">
@@ -50,10 +49,9 @@ export function ProductCard({ product: p }: { product: ProductWithStock }) {
         </div>
       </Link>
       {variants.length === 1 ? (
-        <form action={addToCart} className="mt-auto flex items-center gap-1.5 px-0.5 pt-3 pb-0.5">
+        <form action={addToCart} className="mt-auto self-start">
           <input type="hidden" name="variantId" value={variants[0].id} />
-          <QtyStepper max={variants[0].stock} />
-          <button className="btn min-w-0 flex-1 px-2">
+          <button className="btn px-6 py-1.5 text-xs">
             <span className="hidden sm:block">
               <BagIcon />
             </span>
@@ -62,11 +60,11 @@ export function ProductCard({ product: p }: { product: ProductWithStock }) {
         </form>
       ) : variants.length ? (
         // Several sizes/colors: the choice is made on the product page, never guessed here.
-        <Link href={`/product/${p.id}`} className="btn mt-auto px-2">
+        <Link href={`/product/${p.id}`} className="btn mt-auto self-start px-6 py-1.5 text-xs">
           <span className="hidden sm:block">
             <BagIcon />
           </span>
-          انتخاب سایز و خرید
+          خرید
         </Link>
       ) : (
         <p className="mt-auto px-1.5 pt-3 pb-2 text-xs text-muted">به‌زودی دوباره موجود می‌شود</p>
