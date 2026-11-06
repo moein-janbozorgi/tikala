@@ -35,6 +35,10 @@ export async function saveProduct(form: FormData) {
   const keptPhotos = id ? (db.prepare("SELECT id FROM product_images WHERE product_id = ?").all(id) as { id: number }[]).filter((p) => !removed.includes(p.id)).length : 0;
   const newPhotos = form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
   if (keptPhotos + newPhotos.length > MAX_PHOTOS) fail(back, `حداکثر ${MAX_PHOTOS.toLocaleString("fa-IR")} تصویر اضافه برای هر محصول`);
+  // Photo colors: "photo_color_<id>" for kept photos, "photos_color" for the new uploads; same 20-character limit as variant colors.
+  const newColor = text(form, "photos_color");
+  const photoColors = [...form.keys()].filter((k) => k.startsWith("photo_color_")).map((k) => ({ id: Number(k.slice(12)), color: text(form, k) }));
+  if ([newColor, ...photoColors.map((p) => p.color)].some((c) => c.length > 20)) fail(back, "رنگ تصویر حداکثر ۲۰ کاراکتر است");
 
   // An uploaded file wins over the URL field.
   const file = form.get("imageFile");
@@ -62,7 +66,8 @@ export async function saveProduct(form: FormData) {
       const row = db.prepare("DELETE FROM product_images WHERE id = ? AND product_id = ? RETURNING path").get(photoId, productId) as { path: string } | undefined;
       if (row) gone.push(row.path);
     }
-    for (const path of photoPaths) db.prepare("INSERT INTO product_images (product_id, path) VALUES (?, ?)").run(productId, path);
+    for (const p of photoColors) db.prepare("UPDATE product_images SET color = ? WHERE id = ? AND product_id = ?").run(p.color, p.id, productId);
+    for (const path of photoPaths) db.prepare("INSERT INTO product_images (product_id, path, color) VALUES (?, ?, ?)").run(productId, path, newColor);
   });
   await deleteUnusedUploads(gone);
   redirect("/admin/products");

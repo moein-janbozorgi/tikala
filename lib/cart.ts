@@ -51,7 +51,8 @@ export async function getCartLines() {
     if (!Number.isInteger(qty) || qty < 1) continue;
     const row = db
       .prepare(
-        `SELECT v.id, v.size, v.color, v.stock, p.id AS product_id, p.name, p.price, p.image
+        `SELECT v.id, v.size, v.color, v.stock, p.id AS product_id, p.name, p.price,
+                COALESCE((SELECT path FROM product_images i WHERE i.product_id = p.id AND i.color = v.color ORDER BY i.id LIMIT 1), p.image) AS image
          FROM variants v JOIN products p ON p.id = v.product_id WHERE v.id = ? AND p.active = 1`,
       )
       .get(Number(id)) as Omit<CartLine, "qty"> | undefined;

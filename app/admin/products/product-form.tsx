@@ -16,7 +16,8 @@ export function ProductForm({ product, variants = [] }: { product?: Product; var
     subcategory: string;
   }[])
     (types[t.category] ??= []).push(t.subcategory);
-  const photos = product ? (db.prepare("SELECT id, path FROM product_images WHERE product_id = ? ORDER BY id").all(product.id) as { id: number; path: string }[]) : [];
+  const photos = product ? (db.prepare("SELECT id, path, color FROM product_images WHERE product_id = ? ORDER BY id").all(product.id) as { id: number; path: string; color: string }[]) : [];
+  const colors = [...new Set(variants.map((v) => v.color))];
   return (
     <ValidatedForm action={saveProduct} className="card space-y-3">
       <input type="hidden" name="id" value={product?.id ?? ""} />
@@ -79,16 +80,23 @@ export function ProductForm({ product, variants = [] }: { product?: Product; var
       </fieldset>
       <fieldset className="space-y-3 rounded-xl border border-line p-3">
         <legend className="px-1 text-sm">تصاویر بیشتر (گالری، حداکثر ۸)</legend>
+        <p className="text-xs leading-6 text-muted">
+          برای هر تصویر می‌توانید رنگ آن را بنویسید (همان رنگ ستون «سایز | رنگ | موجودی»)؛ مشتری با انتخاب آن رنگ، تصاویرش را می‌بیند. خالی یعنی همه رنگ‌ها.
+        </p>
+        <datalist id="photo-colors">
+          {colors.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
         {photos.length ? (
           <ul className="flex flex-wrap gap-3">
             {photos.map((p) => (
-              <li key={p.id}>
-                <label className="block cursor-pointer text-center text-xs text-muted has-checked:text-danger">
-                  <ProductImage src={p.path} alt="" className="size-20 rounded-lg" />
-                  <span className="mt-1 flex items-center justify-center gap-1">
-                    <input type="checkbox" name="remove_photo" value={p.id} />
-                    حذف
-                  </span>
+              <li key={p.id} className="w-24 space-y-1 text-center text-xs text-muted">
+                <ProductImage src={p.path} alt="" className="size-24 rounded-lg" />
+                <input name={`photo_color_${p.id}`} defaultValue={p.color} list="photo-colors" maxLength={20} placeholder="رنگ" aria-label="رنگ تصویر" className="input px-2 py-1 text-xs" />
+                <label className="flex cursor-pointer items-center justify-center gap-1 has-checked:text-danger">
+                  <input type="checkbox" name="remove_photo" value={p.id} />
+                  حذف
                 </label>
               </li>
             ))}
@@ -98,6 +106,10 @@ export function ProductForm({ product, variants = [] }: { product?: Product; var
           <span className="mb-1 block text-xs text-muted">افزودن تصویر (می‌توانید چند فایل را با هم انتخاب کنید؛ هر کدام حداکثر ۵ مگابایت)</span>
           <input name="photos" type="file" multiple accept="image/jpeg,image/png,image/webp" data-check="image" className="input text-sm file:me-3 file:rounded-full file:border-0 file:bg-surface-2 file:px-3 file:py-1" />
           <FieldError name="photos" label="تصاویر" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-muted">رنگ تصاویر جدید (اختیاری)</span>
+          <input name="photos_color" list="photo-colors" maxLength={20} placeholder="مثلاً مشکی" className="input" />
         </label>
       </fieldset>
       <label className="block">

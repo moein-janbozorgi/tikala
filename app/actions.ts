@@ -22,8 +22,17 @@ const authUrl = (from: string, params: Record<string, string>) => `${from}${from
 // The modal has its own error param, so the page under it doesn't show the same message.
 const authFail = (path: string, message: string) => fail(path, message, "auth_error");
 
+/** Adds a variant to the cart: by "variantId" (product cards), or by "productId" + "size" + "color" (the product page's two pickers). */
 export async function addToCart(form: FormData) {
-  const variantId = Number(form.get("variantId"));
+  const productId = Number(form.get("productId"));
+  let variantId = Number(form.get("variantId"));
+  if (productId) {
+    const row = db.prepare("SELECT id FROM variants WHERE product_id = ? AND size = ? AND color = ?").get(productId, str(form, "size"), str(form, "color")) as
+      | { id: number }
+      | undefined;
+    if (!row) fail(`/product/${productId}`, "این سایز در این رنگ موجود نیست");
+    variantId = row!.id;
+  }
   const qty = Math.max(1, Math.floor(Number(form.get("qty"))) || 1);
   const variant = db.prepare("SELECT v.product_id, v.stock FROM variants v JOIN products p ON p.id = v.product_id WHERE v.id = ? AND p.active = 1").get(variantId) as
     | { product_id: number; stock: number }

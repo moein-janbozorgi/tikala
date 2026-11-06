@@ -91,11 +91,18 @@ const refused = await fetch(base + "/", { method: "POST", body: loginPost, heade
 check(refused.headers.get("location") === "/", "login action refuses a signed-in user");
 
 const productHtml = (await get("/product/1")).html;
-const variantId = Number(productHtml.match(/name="variantId" checked="" value="(\d+)"/)[1]);
+// Separate color and size pickers, first in-stock pair picked; product 1 is S/M سفید and L مشکی.
+const picked = (name) => productHtml.match(new RegExp(`<input[^>]*name="${name}"[^>]*>`, "g"))?.find((i) => i.includes('checked=""'))?.match(/value="([^"]+)"/)[1];
+const color = picked("color");
+const size = picked("size");
+check(color === "سفید" && size === "S" && productHtml.includes('#product:has([data-c="1"]:checked) [data-s="0"]'), "product page has color and size pickers, sizes missing in a color crossed out");
+const variantId = new (await import("node:sqlite")).DatabaseSync(process.env.DB_PATH).prepare("SELECT id FROM variants WHERE product_id = 1 AND size = ? AND color = ?").get(size, color).id;
 // index 0 = logout form in header, 1 = theme, 2 = add to cart
-r = await submit("/product/1", 2, { variantId, qty: 999 });
+r = await submit("/product/1", 2, { productId: 1, size, color, qty: 999 });
 check(r.location?.includes("error="), "over-stock add rejected");
-r = await submit("/product/1", 2, { variantId, qty: 2 });
+r = await submit("/product/1", 2, { productId: 1, size: "S", color: "مشکی", qty: 1 });
+check(decodeURIComponent(r.location ?? "").includes("این سایز در این رنگ موجود نیست"), "size not made in the picked color rejected");
+r = await submit("/product/1", 2, { productId: 1, size, color, qty: 2 });
 check(r.location === "/cart", "add to cart");
 check((await get("/cart")).html.includes("ثبت سفارش"), "cart shows checkout form");
 
@@ -182,9 +189,11 @@ check(!/<html[^>]*data-theme=/.test((await get("/")).html), "theme back to syste
 
 // Buy straight from a home-page card: forms are 0 logout, 1 theme, then one per in-stock product card.
 const home = (await get("/")).html;
-check(home.includes('aria-label="افزایش تعداد"') && home.includes('aria-label="کاهش تعداد"') && home.includes(">خرید</button>"), "cards show stepper and buy button");
-const cardVariant = home.match(/name="variantId" checked="" value="(\d+)"/)[1];
-r = await submit("/", 2, { variantId: cardVariant, qty: 2 }); // this variant has 3 in stock
+// Cards have no stepper or size chips: one-variant products buy directly, the rest link to the product page.
+check(!home.includes('aria-label="افزایش تعداد"') && !home.includes('name="variantId" checked') && home.includes(">خرید</button>") && home.includes(">خرید</a>"), "cards show only a buy button");
+const cardVariant = home.match(/<input type="hidden" name="variantId" value="(\d+)"/)[1];
+new (await import("node:sqlite")).DatabaseSync(process.env.DB_PATH).prepare("UPDATE variants SET stock = 3 WHERE id = ?").run(cardVariant); // the cart checks below expect 3 in stock
+r = await submit("/", 2, { variantId: cardVariant, qty: 2 });
 const cartQty = (html) => html.match(new RegExp(`name="variantId" value="${cardVariant}"/>[\\s\\S]*?aria-label="تعداد"[^>]*>([۰-۹]+)<`))?.[1];
 check(r.location === "/cart" && cartQty((await get("/cart")).html) === "۲", "card buy adds chosen quantity to cart");
 // Cart stepper: each button posts the quantity it leads to (+ → 3), and at 1 the − becomes a trash button that posts 0.
@@ -259,7 +268,7 @@ check(outbox().includes(`${process.env.ADMIN_PHONE ?? "09350000009"}\tتیکلا
 
 // ---------- Search and pagination ----------
 const all = (await get("/")).html;
-const cards = (html) => html.split('href="/product/').length - 1;
+const cards = (html) => html.split("<article").length - 1;
 check(all.includes("نمایش محصولات بیشتر") && all.includes("?page=2") && cards(all) === 12, "home page shows 12 products and a load-more link");
 check(/popovertarget="side-menu"/i.test(all) && all.includes('id="side-menu"') && all.includes("?category=" + encodeURIComponent("کفش")) && all.includes("کاپشن و ژاکت"), "side menu lists categories, including the new ones");
 const bootsLink = "/?" + new URLSearchParams({ category: "کفش", type: "بوت" });
@@ -360,13 +369,14 @@ const blue = await sharp({ create: { width: 800, height: 1000, channels: 3, back
 const shawl = { name: "شال حراجی", price: 80000, compare_price: 100000, category: "اکسسوری", image: "", variants: "Free | آبی | 5", active: "on" };
 r = await submitForm("/admin/products/new", 'name="variants"', { ...shawl, compare_price: 80000 });
 check(decodeURIComponent(r.location ?? "").includes("قیمت قبل از تخفیف"), "before-price not above the price is rejected");
-r = await submitForm("/admin/products/new", 'name="variants"', { ...shawl, photos: [new File([red], "a.png", { type: "image/png" }), new File([blue], "b.png", { type: "image/png" })] });
+r = await submitForm("/admin/products/new", 'name="variants"', { ...shawl, photos_color: "آبی", photos: [new File([red], "a.png", { type: "image/png" }), new File([blue], "b.png", { type: "image/png" })] });
 const shawlId = sqlite().prepare("SELECT id FROM products WHERE name = ?").get("شال حراجی").id;
 check(/^\/uploads\/.+\.webp$/.test(sqlite().prepare("SELECT image FROM products WHERE id = ?").get(shawlId).image), "with no main photo, the first gallery photo becomes the main one");
 const saleList = (await get("/?sale=1")).html;
 check(r.location === "/admin/products" && saleList.includes("شال حراجی") && saleList.includes("۲۰٪ تخفیف") && !saleList.includes("تی‌شرت نخی ساده"), "sale filter lists only discounted products, with the % badge");
 let shawlPage = (await get(`/product/${shawlId}`)).html;
 check(shawlPage.includes('href="#photo-2"') && (shawlPage.match(/id="photo-\d"/g) ?? []).length === 2 && /<s [^>]*>[^<]*۱۰۰٬۰۰۰/.test(shawlPage), "product page shows the gallery and the struck-through old price");
+check(sqlite().prepare("SELECT color FROM product_images WHERE product_id = ?").get(shawlId).color === "آبی" && shawlPage.includes('data-pc="0"') && shawlPage.includes('[data-c="0"]:checked'), "gallery photos get a color, and picking that color shows them");
 check(shawlPage.includes("محصولات مشابه") && shawlPage.includes("کلاه زمستانی"), "related products from the same category");
 const photo = sqlite().prepare("SELECT id, path FROM product_images WHERE product_id = ? ORDER BY id LIMIT 1").get(shawlId);
 r = await submitForm(`/admin/products/${shawlId}`, 'name="variants"', { ...shawl, id: shawlId, image: sqlite().prepare("SELECT image FROM products WHERE id = ?").get(shawlId).image, remove_photo: photo.id });

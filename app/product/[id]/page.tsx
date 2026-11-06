@@ -30,7 +30,28 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
   if (!product) notFound();
   const variants = db.prepare("SELECT * FROM variants WHERE product_id = ? ORDER BY id").all(product.id) as Variant[];
   const firstInStock = variants.find((v) => v.stock > 0);
-  const photos = [product.image, ...(db.prepare("SELECT path FROM product_images WHERE product_id = ? ORDER BY id").all(product.id) as { path: string }[]).map((r) => r.path)].filter(Boolean);
+  const gallery = [
+    { path: product.image, color: "" },
+    ...(db.prepare("SELECT path, color FROM product_images WHERE product_id = ? ORDER BY id").all(product.id) as { path: string; color: string }[]),
+  ].filter((p) => p.path);
+  const photos = gallery.map((p) => p.path);
+  // Colors by index (CSS-safe). Picking a size/color chip shows that color's photos first and hides other colors' photos;
+  // photos with no color always show. Plain CSS (:has), like the rest of the gallery, so no JavaScript needed.
+  const colors = [...new Set(variants.map((v) => v.color))];
+  const colorOf = (color: string) => (colors.includes(color) ? colors.indexOf(color) : undefined);
+  const colorCss = colors
+    .map((c, k) =>
+      gallery.some((p) => p.color === c)
+        ? `#product:has([data-c="${k}"]:checked) [data-pc]:not([data-pc="${k}"]){display:none}#product:has([data-c="${k}"]:checked) [data-pc="${k}"]{order:-1}`
+        : "",
+    )
+    .join("");
+  // Sizes missing or sold out in the picked color are crossed out (same CSS-only approach).
+  const sizes = [...new Set(variants.map((v) => v.size))];
+  const soldOut = colors.flatMap((c, k) =>
+    sizes.flatMap((s, j) => (variants.some((v) => v.color === c && v.size === s && v.stock > 0) ? [] : [`#product:has([data-c="${k}"]:checked) [data-s="${j}"]`])),
+  );
+  const pickerCss = colorCss + (soldOut.length ? `${soldOut.join(",")}{text-decoration:line-through;opacity:.4;pointer-events:none}` : "");
   const off = percentOff(product.price, product.compare_price);
   const sizeGuide = product.category
     ? ((db.prepare("SELECT size_guide FROM categories WHERE name = ?").get(product.category) as { size_guide: string } | undefined)?.size_guide ?? "")
@@ -81,13 +102,14 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         ) : null}
       </nav>
 
-      <div className="grid gap-10 md:grid-cols-2">
+      {pickerCss ? <style>{pickerCss}</style> : null}
+      <div id="product" className="grid gap-10 md:grid-cols-2">
         {/* Gallery: swipe (or scroll) between photos; thumbnails jump to one. Plain links and CSS, so no JavaScript needed. */}
         <div className="min-w-0">
           <div className="relative">
             <div className="flex snap-x snap-mandatory overflow-x-auto rounded-3xl [scrollbar-width:none]">
               {(photos.length ? photos : [""]).map((src, i) => (
-                <div key={i} id={`photo-${i + 1}`} className="w-full shrink-0 snap-center scroll-mt-24">
+                <div key={i} id={`photo-${i + 1}`} data-pc={colorOf(gallery[i]?.color ?? "")} className="w-full shrink-0 snap-center scroll-mt-24">
                   <ProductImage src={src} alt={i ? `${product.name}، تصویر ${(i + 1).toLocaleString("fa-IR")}` : product.name} className="aspect-4/5 w-full" />
                 </div>
               ))}
@@ -101,7 +123,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
           {photos.length > 1 ? (
             <nav aria-label="تصاویر محصول" className="mt-3 flex gap-2 overflow-x-auto pb-1">
               {photos.map((src, i) => (
-                <a key={i} href={`#photo-${i + 1}`} aria-label={`تصویر ${(i + 1).toLocaleString("fa-IR")}`} className="shrink-0 rounded-xl ring-accent hover:ring-2">
+                <a key={i} href={`#photo-${i + 1}`} data-pc={colorOf(gallery[i].color)} aria-label={`تصویر ${(i + 1).toLocaleString("fa-IR")}`} className="shrink-0 rounded-xl ring-accent hover:ring-2">
                   <ProductImage src={src} alt="" className="size-16 rounded-xl sm:size-20" />
                 </a>
               ))}
@@ -122,25 +144,42 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
           <p className="mt-6 leading-8 whitespace-pre-line text-muted">{product.description}</p>
 
           <form action={addToCart} className="mt-8 space-y-6">
+            <input type="hidden" name="productId" value={product.id} />
             <fieldset>
-              <legend className="mb-3 text-sm font-medium">سایز و رنگ</legend>
+              <legend className="mb-3 text-sm font-medium">رنگ</legend>
               <div className="flex flex-wrap gap-2">
-                {variants.map((v) => (
-                  <label
-                    key={v.id}
-                    className="chip has-checked:chip-active has-disabled:cursor-not-allowed has-disabled:line-through has-disabled:opacity-40 has-focus-visible:ring-2 has-focus-visible:ring-accent"
-                    title={v.stock === 0 ? "ناموجود" : `موجودی: ${v.stock.toLocaleString("fa-IR")}`}
-                  >
+                {colors.map((c, k) => (
+                  <label key={c} className={CHIP}>
                     <input
                       type="radio"
-                      name="variantId"
-                      value={v.id}
-                      disabled={v.stock === 0}
-                      defaultChecked={v.id === firstInStock?.id}
+                      name="color"
+                      value={c}
+                      data-c={k}
+                      disabled={!variants.some((v) => v.color === c && v.stock > 0)}
+                      defaultChecked={c === firstInStock?.color}
                       required
                       className="sr-only"
                     />
-                    {toPersianDigits(v.size)} · {v.color}
+                    {c}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="mb-3 text-sm font-medium">سایز</legend>
+              <div className="flex flex-wrap gap-2">
+                {sizes.map((s, j) => (
+                  <label key={s} data-s={j} className={CHIP}>
+                    <input
+                      type="radio"
+                      name="size"
+                      value={s}
+                      disabled={!variants.some((v) => v.size === s && v.stock > 0)}
+                      defaultChecked={s === firstInStock?.size}
+                      required
+                      className="sr-only"
+                    />
+                    {toPersianDigits(s)}
                   </label>
                 ))}
               </div>
@@ -180,6 +219,9 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
     </>
   );
 }
+
+const CHIP =
+  "chip has-checked:chip-active has-disabled:cursor-not-allowed has-disabled:line-through has-disabled:opacity-40 has-focus-visible:ring-2 has-focus-visible:ring-accent";
 
 /**
  * The category's size guide, written by the admin as lines of "cell | cell | …"; the first line is the header.

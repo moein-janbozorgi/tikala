@@ -453,6 +453,15 @@ transaction(() => {
   `);
 });
 
+// v12: a color on each gallery photo ('' = any color), so picking a color on the product page shows its photos.
+transaction(() => {
+  if (schemaVersion() >= 12) return;
+  db.exec(`
+    ALTER TABLE product_images ADD COLUMN color TEXT NOT NULL DEFAULT '';
+    PRAGMA user_version = 12;
+  `);
+});
+
 /** Records a search that found products. The term is cut and spaces collapsed, so variants of one search add up. */
 export function countSearch(q: string) {
   db.prepare("INSERT INTO search_counts (q, count) VALUES (?, 1) ON CONFLICT (q) DO UPDATE SET count = count + 1").run(q.trim().replace(/\s+/g, " ").slice(0, 50));
