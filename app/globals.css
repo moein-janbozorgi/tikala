@@ -64,6 +64,10 @@ body {
 }
 
 @layer components {
+  /* Placeholder block shown by the loading.tsx files while a page streams in. */
+  .skeleton {
+    @apply animate-pulse rounded-2xl bg-surface-2 motion-reduce:animate-none;
+  }
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-brand-ink transition hover:brightness-95 disabled:pointer-events-none disabled:opacity-40;
   }

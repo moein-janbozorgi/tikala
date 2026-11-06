@@ -1,5 +1,6 @@
 import { appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { ADMIN_PHONE } from "./auth";
 import { db } from "./db";
 import { toman } from "./format";
 
@@ -62,13 +63,19 @@ export async function notifyOrder(orderId: number, event: "placed" | "paid" | "s
       ? `سفارش ${n} ارسال شد. کد رهگیری مرسوله: ${order.tracking_code}. از خرید شما سپاسگزاریم.`
       : `سفارش ${n} ارسال شد. از خرید شما سپاسگزاریم.`,
   }[event];
-  const message = `تیکلا: ${text}`;
+  await send(order.phone, `تیکلا: ${text}`, orderId);
+  // The shop owner hears about every new order (cash on delivery when placed, online once paid) without opening /admin.
+  if (event !== "shipped") await send(ADMIN_PHONE, `تیکلا: سفارش جدید ${n} به مبلغ ${toman(order.total)} (${event === "paid" ? "پرداخت آنلاین" : "پرداخت هنگام تحویل"})`, orderId);
+}
+
+/** One order message. Best effort: a failure is logged, and never stops the next message. */
+async function send(phone: string, message: string, orderId: number) {
   try {
-    if (consoleMode) return toOutbox(order.phone, message);
+    if (consoleMode) return toOutbox(phone, message);
     if (!key) return; // production without SMS configured: nothing to send
     const sender = process.env.KAVENEGAR_SENDER;
-    await kavenegar("sms/send", { receptor: order.phone, message, ...(sender ? { sender } : {}) });
+    await kavenegar("sms/send", { receptor: phone, message, ...(sender ? { sender } : {}) });
   } catch (e) {
-    console.error(`SMS for order ${orderId} failed`, e);
+    console.error(`SMS for order ${orderId} to ${phone} failed`, e);
   }
 }

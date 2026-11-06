@@ -255,6 +255,7 @@ check(decodeURIComponent(r.location ?? "").includes("تعداد تلاش بیش 
 // ---------- SMS ----------
 await new Promise((r) => setTimeout(r, 300)); // notifications are sent just after the response
 check(outbox().includes("ثبت شد") && outbox().includes("پرداخت سفارش") && outbox().includes("ارسال شد"), "order SMS: placed, paid and shipped messages sent");
+check(outbox().includes(`${process.env.ADMIN_PHONE ?? "09350000009"}\tتیکلا: سفارش جدید`), "the admin gets an SMS for new orders");
 
 // ---------- Search and pagination ----------
 const all = (await get("/")).html;
@@ -267,6 +268,11 @@ const boots = (await get(bootsLink)).html;
 check(cards(boots) === 1 && boots.includes("بوت چرم قهوه‌ای سوخته") && !boots.includes("نوع:") && !all.includes(" کالا<"), "type filter shows only that type; types and counts live only in the menu");
 const page2 = (await get("/?page=2")).html;
 check(cards(page2) === 24 && page2.includes("استایل هر روزت را این‌جا پیدا کن"), "?page=2 grows the list to 24, banner stays (infinite scroll)");
+const api = async (q) => (await fetch(`${base}/api/products?${q}`)).json();
+const [api1, api2, apiEnd] = [await api("page=1"), await api("page=2"), await api("page=999")];
+const ids = (r) => r.items.map((p) => p.id);
+check(api2.items.length === 12 && api2.hasMore && !ids(api2).some((id) => ids(api1).includes(id)) && page2.includes(`href="/product/${api2.items[0].id}"`), "/api/products returns just the next 12 products, the same ones ?page=2 adds");
+check(apiEnd.items.length === 0 && !apiEnd.hasMore, "/api/products past the end is empty");
 const found = (await get("/?q=" + encodeURIComponent("هودي"))).html; // Arabic ي on purpose
 check(found.includes("هودی مشکی طرح جمجمه") && !found.includes("شلوار جین مشکی اسلیم") && found.includes("نتیجه برای"), "search finds hoodies (Arabic ي normalized)");
 check((await get("/?q=" + encodeURIComponent("%"))).html.includes("محصولی یافت نشد"), "search treats % literally");

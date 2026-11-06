@@ -26,6 +26,12 @@ export async function GET(req: NextRequest) {
         const refId = await verifyPayment(authority, toRial(order!.total));
         const paid = db.prepare("UPDATE orders SET status = 'pending', ref_id = ? WHERE id = ? AND status = 'awaiting_payment'").run(refId, order!.id);
         if (paid.changes) after(() => notifyOrder(order!.id, "paid"));
+        else {
+          // Expired (cancelled) while Zarinpal was verifying: the money is taken, so keep the bank reference for the refund.
+          db.prepare("UPDATE orders SET ref_id = ? WHERE id = ?").run(refId, order!.id);
+          console.error(`Order ${order!.id} was paid (ref ${refId}) after it was cancelled; refund it`);
+          error = "پرداخت انجام شد ولی مهلت سفارش تمام شده بود؛ مبلغ توسط فروشگاه بازگردانده می‌شود";
+        }
       } catch (e) {
         error = e instanceof Error ? e.message : "خطا در تأیید پرداخت";
       }

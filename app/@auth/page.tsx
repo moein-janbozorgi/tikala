@@ -8,6 +8,7 @@ import { ErrorMessage } from "../error-message";
 import { CloseIcon } from "../icons";
 import { NAME_PATTERN, NAME_RULE, EMAIL_PATTERN } from "@/lib/rules";
 import { FieldError, ValidatedForm } from "../validated-form";
+import { SubmitButton } from "../submit-button";
 import { CloseOnEscape } from "./close-on-escape";
 import { CodeToast } from "./code-toast";
 import { ResendButton } from "./resend-button";
@@ -66,7 +67,7 @@ export default async function AuthModal({ params, searchParams }: Props) {
                 <input name="phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" placeholder={toPersianDigits("09121234567")} required data-check="phone" className="input text-right" />
                 <FieldError name="phone" label="شماره موبایل" />
               </label>
-              <button className="btn w-full">دریافت کد ورود</button>
+              <SubmitButton className="btn w-full">دریافت کد ورود</SubmitButton>
             </ValidatedForm>
 
             <details className="group border-t border-line pt-5">

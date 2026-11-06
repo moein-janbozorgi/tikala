@@ -157,7 +157,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
                 <ConfirmButton
                   name="cancel"
                   value="1"
-                  message={`سفارش #${o.id.toLocaleString("fa-IR")} لغو شود؟ اقلام به انبار برمی‌گردند و لغو قابل بازگشت نیست.`}
+                  message={`سفارش #${o.id.toLocaleString("fa-IR")} لغو شود؟ اقلام به انبار برمی‌گردند و لغو قابل بازگشت نیست.${o.payment === "online" && o.status !== "awaiting_payment" ? " مبلغ را از پنل زرین‌پال به مشتری برگردانید." : ""}`}
                   className="btn-ghost px-3 py-1.5 text-xs"
                 >
                   لغو سفارش

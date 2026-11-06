@@ -97,7 +97,8 @@ export function SearchBox({ categories, popular }: { categories: { category: str
     if (!typed) return;
     const abort = new AbortController();
     const timer = setTimeout(() => {
-      fetch(`/api/suggest?${new URLSearchParams({ q: typed })}`, { signal: abort.signal })
+      // A stalled connection gives up after 8 s and shows "nothing found"; Enter still searches.
+      fetch(`/api/suggest?${new URLSearchParams({ q: typed })}`, { signal: AbortSignal.any([abort.signal, AbortSignal.timeout(8000)]) })
         .then((res) => (res.ok ? res.json() : []))
         .then((items: Suggestion[]) => setFound({ q: typed, items }))
         // Offline or a server error: show "nothing found" rather than loading forever; Enter still searches.

@@ -8,6 +8,7 @@ import { NAME_PATTERN, NAME_RULE } from "@/lib/rules";
 import { FREE_SHIPPING_FROM, shippingCost, toman } from "@/lib/format";
 import { applyCoupon, checkout, updateCartItem } from "../actions";
 import { FieldError, ValidatedForm } from "../validated-form";
+import { SubmitButton } from "../submit-button";
 import { AddressFields } from "./address-fields";
 import { ErrorMessage } from "../error-message";
 import { BagIcon, MinusIcon, PlusIcon, TrashIcon } from "../icons";
@@ -224,7 +225,7 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
                 ))}
               </div>
             </fieldset>
-            <button className="btn w-full">ثبت سفارش و پرداخت</button>
+            <SubmitButton className="btn w-full">ثبت سفارش و پرداخت</SubmitButton>
           </ValidatedForm>
         ) : (
           <Link href="/cart?auth=login" scroll={false} className="btn w-full">

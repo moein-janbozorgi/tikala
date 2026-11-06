@@ -8,8 +8,7 @@ import { addToCart } from "../../actions";
 import { ErrorMessage } from "../../error-message";
 import { ProductImage } from "../../product-image";
 import { QtyStepper } from "../../qty-stepper";
-
-const getProduct = (id: string) => db.prepare("SELECT * FROM products WHERE id = ? AND active = 1").get(Number(id)) as Product | undefined;
+import { getProduct } from "./get-product";
 
 export async function generateMetadata({ params }: PageProps<"/product/[id]">): Promise<Metadata> {
   const product = getProduct((await params).id);

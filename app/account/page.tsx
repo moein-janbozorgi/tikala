@@ -6,6 +6,7 @@ import { ConfirmButton } from "../admin/confirm-button";
 import { ErrorMessage } from "../error-message";
 import { OrderCard, type Order } from "../order-card";
 import { FieldError, ValidatedForm } from "../validated-form";
+import { SubmitButton } from "../submit-button";
 
 export default async function AccountPage({ searchParams }: PageProps<"/account">) {
   const user = await requireUser("/account");
@@ -30,7 +31,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
               {o.status === "awaiting_payment" ? (
                 <form action={payOrder}>
                   <input type="hidden" name="orderId" value={o.id} />
-                  <button className="btn">پرداخت آنلاین</button>
+                  <SubmitButton className="btn">پرداخت آنلاین</SubmitButton>
                 </form>
               ) : null}
               <form action={cancelMyOrder}>

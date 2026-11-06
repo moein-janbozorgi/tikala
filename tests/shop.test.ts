@@ -372,3 +372,22 @@ test("popular searches: most-made first, spaces collapsed, product types fill th
   assert.equal(list.length, 6);
   assert.equal(new Set(list).size, 6);
 });
+
+test("product listing: home shows pages 1..N, the API one page at a time, with filters applied", async () => {
+  const { listProducts, PAGE_SIZE } = await import("../lib/products.ts");
+  const all = listProducts({});
+  assert.ok(all.total > PAGE_SIZE * 2); // the samples span several pages
+  const ids = (params: Record<string, string>, only = false) => listProducts(params, only).products.map((p) => p.id);
+  const [p1, p2] = [ids({ page: "1" }, true), ids({ page: "2" }, true)];
+  assert.equal(p1.length, PAGE_SIZE);
+  assert.deepEqual(ids({ page: "2" }), [...p1, ...p2]); // home ?page=2 = API pages 1 and 2, in order, no overlap
+  assert.equal(new Set([...p1, ...p2]).size, PAGE_SIZE * 2);
+  assert.deepEqual(listProducts({ page: "999" }, true).products, []); // past the end: empty, not clamped
+  assert.equal(listProducts({ page: "999" }).page, all.pages); // the home page clamps it
+  const shoes = listProducts({ category: "کفش", sort: "cheap" });
+  assert.ok(shoes.products.every((p) => p.category === "کفش"));
+  assert.deepEqual(shoes.products.map((p) => p.price), shoes.products.map((p) => p.price).toSorted((a, b) => a - b));
+  const cheap = listProducts({ max: String(shoes.products[1].price), category: "کفش" });
+  assert.ok(cheap.products.length >= 2 && cheap.products.every((p) => p.price <= shoes.products[1].price));
+  assert.ok(listProducts({}).products.every((p) => p.variants.every((v) => v.product_id === p.id && v.stock > 0)));
+});

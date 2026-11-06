@@ -51,7 +51,7 @@ export async function saveProduct(form: FormData) {
   if (!image && photoPaths.length) image = photoPaths.shift()!;
 
   const values = [name, description, category, subcategory, price, comparePrice, image, form.get("active") ? 1 : 0];
-  let gone: string[] = [];
+  const gone: string[] = [];
   transaction(() => {
     const productId = id
       ? (db.prepare("UPDATE products SET name=?, description=?, category=?, subcategory=?, price=?, compare_price=?, image=?, active=? WHERE id=?").run(...values, id), id)
@@ -64,18 +64,25 @@ export async function saveProduct(form: FormData) {
     }
     for (const path of photoPaths) db.prepare("INSERT INTO product_images (product_id, path) VALUES (?, ?)").run(productId, path);
   });
-  // Files of removed photos are deleted unless something still shows them.
-  gone = gone.filter((p) => !db.prepare("SELECT 1 FROM products WHERE image = ? UNION SELECT 1 FROM product_images WHERE path = ?").get(p, p));
-  await Promise.all(gone.map(deleteUpload));
+  await deleteUnusedUploads(gone);
   redirect("/admin/products");
 }
 
 const MAX_PHOTOS = 8;
 
-/** Deletes a product and its variants. Past orders keep their own copy of the name, size, color and price. */
+/** Deletes the files of photos no product shows any more. */
+async function deleteUnusedUploads(paths: string[]) {
+  const unused = paths.filter((p) => !db.prepare("SELECT 1 FROM products WHERE image = ? UNION SELECT 1 FROM product_images WHERE path = ?").get(p, p));
+  await Promise.all(unused.map(deleteUpload));
+}
+
+/** Deletes a product, its variants and its photo files. Past orders keep their own copy of the name, size, color and price. */
 export async function deleteProduct(form: FormData) {
   await requireAdmin();
-  db.prepare("DELETE FROM products WHERE id = ?").run(Number(form.get("id")));
+  const id = Number(form.get("id"));
+  const photos = (db.prepare("SELECT image AS path FROM products WHERE id = ? UNION SELECT path FROM product_images WHERE product_id = ?").all(id, id) as { path: string }[]).map((r) => r.path);
+  db.prepare("DELETE FROM products WHERE id = ?").run(id);
+  await deleteUnusedUploads(photos);
   redirect("/admin/products?deleted=1");
 }
 

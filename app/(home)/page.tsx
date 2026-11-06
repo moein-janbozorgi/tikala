@@ -1,18 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { countSearch, db, type Product, type Variant } from "@/lib/db";
-import { percentOff, PRICE_STEP, toman } from "@/lib/format";
-import { likeContains, MAX_PRICE, toLatinDigits, toPersianDigits } from "@/lib/validation";
-import { addToCart } from "./actions";
-import { ErrorMessage } from "./error-message";
-import { FEATURES } from "./footer";
-import { BagCheckArt, BagIcon, GlassesIcon, GridIcon, HoodieIcon, JacketIcon, PantsIcon, ShirtIcon, ShoeIcon, SweaterIcon, TshirtIcon } from "./icons";
-import { LoadMore } from "./load-more";
-import { PriceRange } from "./price-range";
-import { ProductImage } from "./product-image";
-import { QtyStepper } from "./qty-stepper";
-
-const PAGE_SIZE = 12;
+import { countSearch, db } from "@/lib/db";
+import { listProducts, SORTS } from "@/lib/products";
+import { ErrorMessage } from "../error-message";
+import { FEATURES } from "../footer";
+import { BagCheckArt, BagIcon, GlassesIcon, GridIcon, HoodieIcon, JacketIcon, PantsIcon, ShirtIcon, ShoeIcon, SweaterIcon, TshirtIcon } from "../icons";
+import { LoadMore } from "../load-more";
+import { PriceRange } from "../price-range";
+import { ProductCard } from "../product-card";
 
 // Icon and circle color per category; a category the admin adds later gets the bag icon and a color by position.
 const CATEGORY_LOOK: Record<string, [() => React.ReactNode, string]> = {
@@ -27,13 +22,6 @@ const CATEGORY_LOOK: Record<string, [() => React.ReactNode, string]> = {
   "عینک": [GlassesIcon, "bg-red-600"],
 };
 const FALLBACK_COLORS = ["bg-violet-600", "bg-amber-500", "bg-cyan-600", "bg-fuchsia-600", "bg-blue-600"];
-
-// ?sort= value -> label and SQL order. Only these fixed strings ever reach the query.
-const SORTS = {
-  new: ["جدیدترین", "id DESC"],
-  cheap: ["ارزان‌ترین", "price ASC, id DESC"],
-  expensive: ["گران‌ترین", "price DESC, id DESC"],
-} as const;
 
 /**
  * Each category (and type) gets its own title and description, so it can rank for searches like «خرید کفش». The
@@ -55,71 +43,13 @@ export async function generateMetadata({ searchParams }: PageProps<"/">): Promis
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
-  const category = typeof params.category === "string" ? params.category : undefined;
-  // Arabic-keyboard ي/ك typed into a Persian search would otherwise never match.
-  const q = typeof params.q === "string" ? params.q.trim().slice(0, 50).replace(/ي/g, "ی").replace(/ك/g, "ک") : "";
-  // A type (subcategory, picked in the side menu) only means something inside its category, e.g. ?category=کفش&type=بوت.
-  const type = category && typeof params.type === "string" ? params.type : undefined;
-  const sort = typeof params.sort === "string" && params.sort in SORTS ? (params.sort as keyof typeof SORTS) : "new";
-  const sale = params.sale === "1";
-  // ?min= / ?max= in Toman; Persian digits and thousands separators are fine, anything else is ignored.
-  const price = (v: unknown) => {
-    const n = typeof v === "string" ? Number(toLatinDigits(v).replace(/\D/g, "")) : 0;
-    return Number.isInteger(n) && n >= 1 && n <= MAX_PRICE ? n : undefined;
-  };
-  let [min, max] = [price(params.min), price(params.max)];
-  if (min && max && min > max) [min, max] = [max, min];
+  const { products, total, page, pages, category, type, q, sort, sale, min, max, lo, hi } = listProducts(params);
   const categories = db
     .prepare("SELECT DISTINCT category FROM products WHERE active = 1 AND category != '' ORDER BY category")
     .all() as { category: string }[];
-
-  const where = ["active = 1"];
-  const args: (string | number)[] = [];
-  if (category) {
-    where.push("category = ?");
-    args.push(category);
-  }
-  if (type) {
-    where.push("subcategory = ?");
-    args.push(type);
-  }
-  if (sale) where.push("compare_price > price");
-  if (q) {
-    const like = likeContains(q);
-    where.push("(name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR category LIKE ? ESCAPE '\\' OR subcategory LIKE ? ESCAPE '\\')");
-    args.push(like, like, like, like);
-  }
-  // The slider's ends: this listing's cheapest and dearest product before the price filter, on the slider's step.
-  const range = db.prepare(`SELECT MIN(price) AS lo, MAX(price) AS hi FROM products WHERE ${where.join(" AND ")}`).get(...args) as { lo: number | null; hi: number | null };
-  const lo = Math.floor((range.lo ?? 0) / PRICE_STEP) * PRICE_STEP;
-  const hi = Math.ceil((range.hi ?? 0) / PRICE_STEP) * PRICE_STEP;
-  // A limit at (or past) an end of the slider filters nothing, so it is dropped and the plain listing stays the plain address.
-  if (min && min <= lo) min = undefined;
-  if (max && max >= hi) max = undefined;
-  if (min) {
-    where.push("price >= ?");
-    args.push(min);
-  }
-  if (max) {
-    where.push("price <= ?");
-    args.push(max);
-  }
-  const filter = where.join(" AND ");
-  const total = (db.prepare(`SELECT COUNT(*) AS n FROM products WHERE ${filter}`).get(...args) as { n: number }).n;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // Feeds «جستجوهای پرطرفدار». Only searches that found something, so that list only ever shows text from the shop.
   // shortcut: a reload counts again, so one visitor can lift a term; count once per session or IP if that gets abused.
-  if (q && total && !params.page) countSearch(q);  // ?page=N shows the first N pages, so infinite scroll can grow the list and a reload or shared link keeps it.
-  // shortcut: every scroll step re-renders the whole list, fine for a few hundred products; switch to fetching only the new page beyond that.
-  const page = Math.min(pages, Math.max(1, Math.floor(Number(params.page)) || 1));
-  const products = db.prepare(`SELECT * FROM products WHERE ${filter} ORDER BY ${SORTS[sort][1]} LIMIT ?`).all(...args, page * PAGE_SIZE) as Product[];
-  const ids = products.map((p) => p.id);
-  const inStock = Map.groupBy(
-    ids.length
-      ? (db.prepare(`SELECT * FROM variants WHERE stock > 0 AND product_id IN (${ids.map(() => "?").join(",")}) ORDER BY id`).all(...ids) as Variant[])
-      : [],
-    (v) => v.product_id,
-  );
+  if (q && total && !params.page) countSearch(q);
   /** Link to this listing with some parameters changed, keeping the rest. */
   const link = (change: Record<string, string | number | undefined>) => {
     const next = new URLSearchParams();
@@ -232,87 +162,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       ) : null}
       {products.length === 0 ? <p className="py-16 text-center text-muted">محصولی یافت نشد.</p> : null}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
-        {products.map((p) => {
-          const variants = inStock.get(p.id) ?? [];
-          return (
-            <article
-              key={p.id}
-              className="group flex flex-col rounded-2xl border border-line bg-surface p-2 sm:p-2.5"
-            >
-              <Link href={`/product/${p.id}`} className="block">
-                <div className="relative overflow-hidden rounded-xl">
-                  <ProductImage
-                    src={p.image}
-                    alt={p.name}
-                    className={`aspect-4/5 w-full transition duration-500 group-hover:scale-105 ${variants.length ? "" : "opacity-60 grayscale"}`}
-                  />
-                  {p.subcategory ? (
-                    <span className="absolute top-2.5 right-2.5 rounded-full bg-surface/85 px-2.5 py-1 text-[11px] font-medium backdrop-blur">
-                      {p.subcategory}
-                    </span>
-                  ) : null}
-                  {percentOff(p.price, p.compare_price) ? (
-                    <span className="absolute top-2.5 left-2.5 rounded-full bg-danger px-2.5 py-1 text-[11px] font-bold text-page">
-                      {`${percentOff(p.price, p.compare_price).toLocaleString("fa-IR")}٪ تخفیف`}
-                    </span>
-                  ) : null}
-                  {variants.length ? null : (
-                    <span className="absolute inset-x-0 bottom-0 bg-ink/75 py-1.5 text-center text-xs font-medium text-page backdrop-blur">ناموجود</span>
-                  )}
-                </div>
-                <div className="px-1.5 pt-3">
-                  <p className="text-[11px] text-muted">{p.category}</p>
-                  {/* Two lines kept even for short names, so prices and buttons line up across a row. */}
-                  <h2 className="mt-1 line-clamp-2 min-h-[2lh] text-sm leading-6 font-bold sm:text-base sm:leading-6">
-                    {p.name}
-                  </h2>
-                  <p className="mt-2 flex flex-wrap items-baseline gap-x-1">
-                    <span className="text-lg font-extrabold">{p.price.toLocaleString("fa-IR")}</span>
-                    <span className="text-xs text-muted">تومان</span>
-                    {percentOff(p.price, p.compare_price) ? (
-                      <s className="ms-1 text-xs text-muted" aria-label={`قیمت قبل از تخفیف ${toman(p.compare_price)}`}>
-                        {p.compare_price.toLocaleString("fa-IR")}
-                      </s>
-                    ) : null}
-                  </p>
-                </div>
-              </Link>
-              {variants.length ? (
-                <form action={addToCart} className="mt-auto space-y-2 px-0.5 pt-3 pb-0.5">
-                  <fieldset>
-                    <legend className="sr-only">سایز و رنگ {p.name}</legend>
-                    <div className="flex flex-wrap gap-1.5">
-                      {variants.map((v, i) => (
-                        <label
-                          key={v.id}
-                          title={`موجودی: ${v.stock.toLocaleString("fa-IR")}`}
-                          className="chip min-h-8 px-2.5 py-1 text-xs has-checked:chip-active has-focus-visible:ring-2 has-focus-visible:ring-accent"
-                        >
-                          <input type="radio" name="variantId" value={v.id} defaultChecked={i === 0} required className="sr-only" />
-                          {toPersianDigits(v.size)} · {v.color}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                  <div className="flex items-center gap-1.5">
-                    <QtyStepper max={Math.max(...variants.map((v) => v.stock))} />
-                    <button className="btn min-w-0 flex-1 px-2">
-                      <span className="hidden sm:block">
-                        <BagIcon />
-                      </span>
-                      خرید
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <p className="mt-auto px-1.5 pt-3 pb-2 text-xs text-muted">به‌زودی دوباره موجود می‌شود</p>
-              )}
-            </article>
-          );
-        })}
+        {products.map((p) => (
+          <ProductCard key={p.id} product={p} />
+        ))}
       </div>
 
-      {page < pages ? <LoadMore href={link({ page: page + 1 })} /> : null}
+      {page < pages ? <LoadMore key={`${link({})}|${page}`} href={link({ page: page + 1 })} api={`/api/products${link({}).slice(1)}`} page={page + 1} /> : null}
     </>
   );
 }

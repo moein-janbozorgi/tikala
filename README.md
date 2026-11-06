@@ -54,6 +54,7 @@ Customers sign in with a mobile number and a 6-digit SMS code (email and passwor
 - Code rules: valid 3 minutes, 3 tries, one resend per minute, at most 5 codes per number and 10 per visitor IP per hour.
 - The per-IP limit expects Nginx (or another proxy) in front, setting `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` (or `$remote_addr`). Without a proxy, visitors can fake their IP.
 - **Forgot password:** add a mobile number in the account page, then sign in with a code and set a new password there.
+- The admin number (`ADMIN_PHONE`) also gets an SMS for every new order: cash-on-delivery orders when placed, online ones once paid.
 
 ## Product photos
 
@@ -62,6 +63,39 @@ In the admin panel, upload a JPG, PNG or WEBP (up to 5 MB each), or paste an ima
 ## Backups
 
 The server copies the database to `data/backups/shop-YYYY-MM-DD.db` when it starts and then once a day, keeping the newest 14. The admin panel's «دانلود نسخه پشتیبان» link downloads a fresh copy. Both are the database only: product photos are in `data/uploads`. These copies sit on the same disk as the shop, so also copy `data/` to another machine from time to time.
+
+## Error log
+
+Server errors (pages, form actions, API routes) are appended to `data/errors.log`, one per line: time, method, path, kind, digest, message. The digest matches the one the browser console shows for the same error. The file isn't rotated; add it to logrotate or empty it now and then.
+
+## Docker
+
+```bash
+docker build -t tikla .
+docker run -d -p 3000:3000 -v tikla-data:/app/data --env-file .env --name tikla tikla
+```
+
+`.env` holds the variables above (`SITE_URL`, `ZARINPAL_MERCHANT_ID`, `KAVENEGAR_API_KEY`, …). The image is a standalone build (`STANDALONE=1`, see `next.config.ts`), and everything that must survive an update lives in the `/app/data` volume. Keep Nginx in front for HTTPS and the real client IP, as described under SMS.
+
+## CDN (ArvanCloud, Cloudflare…)
+
+Pages show each visitor's own cart and account, so Next marks them `no-store` and a CDN passes them through. It only caches the files: `/_next/static` and `/uploads` (cached forever), `/fonts` (forever) and `/products` (a week).
+
+- Leave query strings in the cache key and pass the `rsc` request header through. Next uses both to tell page data from HTML.
+- **Real client IP:** behind a CDN, every request reaches Nginx from a CDN server. Unless Nginx restores the visitor's IP, the login lockout and the SMS limit count all visitors of one CDN server as one person and lock them all out. In Nginx:
+
+```nginx
+# one line per address range on your CDN's published list (203.0.113.0/24 is only a placeholder)
+set_real_ip_from 203.0.113.0/24;
+real_ip_header X-Forwarded-For;
+real_ip_recursive on;
+
+location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header X-Forwarded-For $remote_addr;  # now the visitor's IP
+    proxy_set_header Host $host;
+}
+```
 
 ## Automatic tests (GitHub Actions)
 

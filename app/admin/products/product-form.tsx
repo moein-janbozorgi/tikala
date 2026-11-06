@@ -3,6 +3,7 @@ import { saveProduct } from "../actions";
 import { ProductImage } from "../../product-image";
 import { CategoryFields } from "./category-fields";
 import { FieldError, ValidatedForm } from "../../validated-form";
+import { SubmitButton } from "../../submit-button";
 import { IMAGE_PATTERN } from "@/lib/rules";
 import { MAX_PRICE } from "@/lib/validation";
 
@@ -122,7 +123,7 @@ export function ProductForm({ product, variants = [] }: { product?: Product; var
         <input type="checkbox" name="active" defaultChecked={product ? !!product.active : true} />
         <span>نمایش در فروشگاه</span>
       </label>
-      <button className="btn">{product ? "ذخیره تغییرات" : "افزودن محصول"}</button>
+      <SubmitButton className="btn">{product ? "ذخیره تغییرات" : "افزودن محصول"}</SubmitButton>
     </ValidatedForm>
   );
 }

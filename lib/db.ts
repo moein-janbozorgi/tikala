@@ -442,6 +442,17 @@ transaction(() => {
   `);
 });
 
+// v11: indexes for the order pages (items per order, a customer's orders) and the unpaid-order expiry check.
+transaction(() => {
+  if (schemaVersion() >= 11) return;
+  db.exec(`
+    CREATE INDEX order_items_order ON order_items (order_id);
+    CREATE INDEX orders_user ON orders (user_id);
+    CREATE INDEX orders_status_created ON orders (status, created_at);
+    PRAGMA user_version = 11;
+  `);
+});
+
 /** Records a search that found products. The term is cut and spaces collapsed, so variants of one search add up. */
 export function countSearch(q: string) {
   db.prepare("INSERT INTO search_counts (q, count) VALUES (?, 1) ON CONFLICT (q) DO UPDATE SET count = count + 1").run(q.trim().replace(/\s+/g, " ").slice(0, 50));
