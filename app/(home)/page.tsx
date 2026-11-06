@@ -5,6 +5,7 @@ import { listProducts, SORTS } from "@/lib/products";
 import { ErrorMessage } from "../error-message";
 import { FEATURES } from "../footer";
 import { BagCheckArt, BagIcon, GlassesIcon, GridIcon, HoodieIcon, JacketIcon, PantsIcon, ShirtIcon, ShoeIcon, SweaterIcon, TshirtIcon } from "../icons";
+import { LinkPending } from "../link-pending";
 import { LoadMore } from "../load-more";
 import { PriceRange } from "../price-range";
 import { ProductCard } from "../product-card";
@@ -21,6 +22,8 @@ const CATEGORY_LOOK: Record<string, [() => React.ReactNode, string]> = {
   "بافت": [SweaterIcon, "bg-lime-600"],
   "عینک": [GlassesIcon, "bg-red-600"],
 };
+// A sort or sale chip's label while its list loads.
+const PENDING_CHIP = "data-pending:animate-pulse data-pending:opacity-50 motion-reduce:animate-none";
 const FALLBACK_COLORS = ["bg-violet-600", "bg-amber-500", "bg-cyan-600", "bg-fuchsia-600", "bg-blue-600"];
 
 /**
@@ -97,13 +100,14 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               aria-current={active ? "page" : undefined}
               className="group flex w-20 shrink-0 flex-col items-center gap-2 sm:w-24"
             >
-              <span
-                className={`block rounded-full ring-offset-2 ring-offset-surface transition group-hover:scale-105 ${active ? "ring-2 ring-accent" : ""}`}
+              {/* While the new list loads: a pulsing ring on the tapped category. */}
+              <LinkPending
+                className={`block rounded-full ring-offset-2 ring-offset-surface transition group-hover:scale-105 data-pending:animate-pulse data-pending:ring-2 data-pending:ring-accent motion-reduce:animate-none ${active ? "ring-2 ring-accent" : ""}`}
               >
                 <span className={`grid size-14 place-items-center rounded-full text-white sm:size-16 [&_svg]:size-7 ${color}`}>
                   <CategoryIcon />
                 </span>
-              </span>
+              </LinkPending>
               <span className={`line-clamp-2 text-center text-xs leading-5 ${active ? "font-bold text-accent" : "font-medium"}`}>
                 {c.category || "همه"}
               </span>
@@ -122,7 +126,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             aria-current={sort === value ? "true" : undefined}
             className={`chip px-3 py-1 ${sort === value ? "chip-active" : ""}`}
           >
-            {label}
+            <LinkPending className={PENDING_CHIP}>{label}</LinkPending>
           </Link>
         ))}
         <Link
@@ -131,7 +135,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           aria-current={sale ? "true" : undefined}
           className={`chip gap-1 px-3 py-1 ${sale ? "border-danger bg-danger text-page" : "text-danger"}`}
         >
-          حراج
+          <LinkPending className={PENDING_CHIP}>حراج</LinkPending>
         </Link>
       </nav>
       <form action="/" aria-label="فیلتر قیمت" className="mb-4 flex flex-wrap items-end gap-x-3 gap-y-1 text-sm">
