@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { percentOff, toman } from "@/lib/format";
-import { toPersianDigits } from "@/lib/phone";
 import type { ProductWithStock } from "@/lib/products";
 import { addToCart } from "./actions";
 import { BagIcon } from "./icons";
 import { ProductImage } from "./product-image";
 import { QtyStepper } from "./qty-stepper";
 
-/** A product in the shop grid, with its in-stock sizes and a buy button. Rendered by the home page and by LoadMore. */
+/** A product in the shop grid, with a buy button (sizes and colors are picked on the product page). Rendered by the home page and by LoadMore. */
 export function ProductCard({ product: p }: { product: ProductWithStock }) {
   const { variants } = p;
   return (
@@ -50,33 +49,25 @@ export function ProductCard({ product: p }: { product: ProductWithStock }) {
           </p>
         </div>
       </Link>
-      {variants.length ? (
-        <form action={addToCart} className="mt-auto space-y-2 px-0.5 pt-3 pb-0.5">
-          <fieldset>
-            <legend className="sr-only">سایز و رنگ {p.name}</legend>
-            <div className="flex flex-wrap gap-1.5">
-              {variants.map((v, i) => (
-                <label
-                  key={v.id}
-                  title={`موجودی: ${v.stock.toLocaleString("fa-IR")}`}
-                  className="chip min-h-8 px-2.5 py-1 text-xs has-checked:chip-active has-focus-visible:ring-2 has-focus-visible:ring-accent"
-                >
-                  <input type="radio" name="variantId" value={v.id} defaultChecked={i === 0} required className="sr-only" />
-                  {toPersianDigits(v.size)} · {v.color}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <div className="flex items-center gap-1.5">
-            <QtyStepper max={Math.max(...variants.map((v) => v.stock))} />
-            <button className="btn min-w-0 flex-1 px-2">
-              <span className="hidden sm:block">
-                <BagIcon />
-              </span>
-              خرید
-            </button>
-          </div>
+      {variants.length === 1 ? (
+        <form action={addToCart} className="mt-auto flex items-center gap-1.5 px-0.5 pt-3 pb-0.5">
+          <input type="hidden" name="variantId" value={variants[0].id} />
+          <QtyStepper max={variants[0].stock} />
+          <button className="btn min-w-0 flex-1 px-2">
+            <span className="hidden sm:block">
+              <BagIcon />
+            </span>
+            خرید
+          </button>
         </form>
+      ) : variants.length ? (
+        // Several sizes/colors: the choice is made on the product page, never guessed here.
+        <Link href={`/product/${p.id}`} className="btn mt-auto px-2">
+          <span className="hidden sm:block">
+            <BagIcon />
+          </span>
+          انتخاب سایز و خرید
+        </Link>
       ) : (
         <p className="mt-auto px-1.5 pt-3 pb-2 text-xs text-muted">به‌زودی دوباره موجود می‌شود</p>
       )}

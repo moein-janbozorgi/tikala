@@ -76,7 +76,7 @@ export function Footer({ categories }: { categories: { category: string }[] }) {
             </ul>
           </nav>
           {CONTACT.length || SOCIAL.length ? (
-            <nav aria-label="تماس با ما" className="col-span-2 sm:col-span-1">
+            <nav id="contact" aria-label="تماس با ما" className="col-span-2 scroll-mt-24 sm:col-span-1">
               <p className="font-bold">تماس با ما</p>
               {CONTACT.length ? (
                 <ul className="mt-4 space-y-3 text-sm text-muted">

@@ -61,6 +61,10 @@ export function SideMenu({ categories }: { categories: Category[] }) {
         <Link href="/about" className="flex rounded-xl px-3 py-2.5 hover:bg-surface-2">
           درباره ما
         </Link>
+        {/* Plain anchor: the footer is in the root layout, so #contact exists on every page. */}
+        <a href="#contact" className="flex rounded-xl px-3 py-2.5 hover:bg-surface-2">
+          تماس با ما
+        </a>
       </nav>
     </div>
   );
