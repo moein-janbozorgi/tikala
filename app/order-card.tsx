@@ -61,7 +61,7 @@ export function OrderCard({ order, children }: { order: Order; children?: React.
           <span dir="ltr" className="font-bold select-all">
             {toPersianDigits(order.tracking_code)}
           </span>{" "}
-          <a href="https://tracking.post.ir/" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+          <a href="https://tracking.post.ir/" target="_blank" rel="noreferrer" className="text-accent underline underline-offset-4">
             رهگیری در سایت پست
           </a>
         </p>

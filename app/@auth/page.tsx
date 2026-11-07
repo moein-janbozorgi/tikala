@@ -90,7 +90,7 @@ export default async function AuthModal({ params, searchParams }: Props) {
                 </p>
                 <p className="text-sm text-muted">
                   حساب ایمیلی ندارید؟{" "}
-                  <Link href={to("register")} scroll={false} className="font-medium text-accent hover:underline">
+                  <Link href={to("register")} scroll={false} className="font-medium text-accent underline underline-offset-4">
                     ثبت‌نام با ایمیل
                   </Link>
                 </p>
@@ -189,7 +189,7 @@ async function Register({ hidden, error, loginHref }: ViewProps) {
       <button className="btn w-full">ثبت‌نام</button>
       <p className="text-center text-sm text-muted">
         حساب دارید؟{" "}
-        <Link href={loginHref} scroll={false} className="font-medium text-accent hover:underline">
+        <Link href={loginHref} scroll={false} className="font-medium text-accent underline underline-offset-4">
           ورود
         </Link>
       </p>

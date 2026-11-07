@@ -54,14 +54,14 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
         <h1 className="mb-6 text-2xl font-extrabold">سبد خرید</h1>
         <ErrorMessage error={error} />
         <ul className="divide-y divide-line rounded-2xl border border-line bg-surface">
-          {lines.map((l) => {
+          {lines.map((l, i) => {
             // Each button submits the quantity it leads to, so it works without JavaScript and a double click can't
             // count twice. If stock dropped below the cart amount, one tap on − brings it down to what's available.
             const less = Math.min(l.qty - 1, l.stock);
             return (
               <li key={l.id} className="flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
                 <Link href={`/product/${l.product_id}`} className="shrink-0">
-                  <ProductImage src={l.image} alt={l.name} className="size-20 rounded-xl sm:size-24" />
+                  <ProductImage src={l.image} alt={l.name} sizes="96px" eager={i === 0} className="size-20 rounded-xl sm:size-24" />
                 </Link>
                 <div className="min-w-0 flex-1 space-y-1">
                   <Link href={`/product/${l.product_id}`} className="line-clamp-1 font-medium hover:text-accent">

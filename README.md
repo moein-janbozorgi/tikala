@@ -79,7 +79,7 @@ docker run -d -p 3000:3000 -v tikla-data:/app/data --env-file .env --name tikla 
 
 ## CDN (ArvanCloud, Cloudflare…)
 
-Pages show each visitor's own cart and account, so Next marks them `no-store` and a CDN passes them through. It only caches the files: `/_next/static` and `/uploads` (cached forever), `/fonts` (forever) and `/products` (a week).
+Pages show each visitor's own cart and account, so Next marks them `no-store` and a CDN passes them through. It only caches the files: `/_next/static` and `/uploads` (cached forever), `/fonts` (forever), `/products` (a week) and `/_next/image` (product photos resized and converted to WebP for each screen size, as long as the original).
 
 - Leave query strings in the cache key and pass the `rsc` request header through. Next uses both to tell page data from HTML.
 - **Real client IP:** behind a CDN, every request reaches Nginx from a CDN server. Unless Nginx restores the visitor's IP, the login lockout and the SMS limit count all visitors of one CDN server as one person and lock them all out. In Nginx:

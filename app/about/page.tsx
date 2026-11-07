@@ -76,7 +76,7 @@ export default function AboutPage() {
               <li key={c.label}>
                 <span className="text-muted">{c.label}: </span>
                 {c.href ? (
-                  <a href={c.href} dir="ltr" className="text-accent hover:underline">
+                  <a href={c.href} dir="ltr" className="text-accent underline underline-offset-4">
                     {c.value}
                   </a>
                 ) : (

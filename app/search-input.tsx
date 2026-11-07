@@ -238,7 +238,7 @@ export function SearchBox({ categories, popular }: { categories: { category: str
                 {products.map((p) => (
                   <li key={p.id}>
                     <Link data-option href={`/product/${p.id}`} className="flex items-center gap-3 rounded-lg p-2 hover:bg-surface-2 focus:bg-surface-2 focus-visible:outline-none!">
-                      <ProductImage src={p.image} alt="" className="size-12 shrink-0 rounded-lg text-[0px]" />
+                      <ProductImage src={p.image} alt="" sizes="48px" className="size-12 shrink-0 rounded-lg text-[0px]" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{p.name}</span>
                         <span className="text-xs text-muted">{p.category}</span>

@@ -111,7 +111,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
             <div className="flex snap-x snap-mandatory overflow-x-auto rounded-3xl [scrollbar-width:none]">
               {(photos.length ? photos : [""]).map((src, i) => (
                 <div key={i} id={`photo-${i + 1}`} data-pc={colorOf(gallery[i]?.color ?? "")} className="w-full shrink-0 snap-center scroll-mt-24">
-                  <ProductImage src={src} alt={i ? `${product.name}، تصویر ${(i + 1).toLocaleString("fa-IR")}` : product.name} className="aspect-4/5 w-full" />
+                  <ProductImage src={src} alt={i ? `${product.name}، تصویر ${(i + 1).toLocaleString("fa-IR")}` : product.name} sizes="(min-width: 1152px) 540px, (min-width: 768px) 50vw, 100vw" eager={i === 0} className="aspect-4/5 w-full" />
                 </div>
               ))}
             </div>
@@ -125,7 +125,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
             <nav aria-label="تصاویر محصول" className="mt-3 flex gap-2 overflow-x-auto pb-1">
               {photos.map((src, i) => (
                 <a key={i} href={`#photo-${i + 1}`} data-pc={colorOf(gallery[i].color)} aria-label={`تصویر ${(i + 1).toLocaleString("fa-IR")}`} className="shrink-0 rounded-xl ring-accent hover:ring-2">
-                  <ProductImage src={src} alt="" className="size-16 rounded-xl sm:size-20" />
+                  <ProductImage src={src} alt="" sizes="80px" className="size-16 rounded-xl sm:size-20" />
                 </a>
               ))}
             </nav>
@@ -204,7 +204,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
             {related.map((p) => (
               <Link key={p.id} href={`/product/${p.id}`} className="group rounded-2xl border border-line bg-surface p-2">
-                <ProductImage src={p.image} alt={p.name} className="aspect-4/5 w-full rounded-xl" />
+                <ProductImage src={p.image} alt={p.name} sizes="(min-width: 1152px) 270px, (min-width: 640px) 25vw, 50vw" className="aspect-4/5 w-full rounded-xl" />
                 <p className="mt-2 line-clamp-1 px-1 text-sm font-bold group-hover:text-accent">{p.name}</p>
                 <p className="px-1 text-sm">
                   {toman(p.price)}

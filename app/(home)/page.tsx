@@ -159,15 +159,16 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       {q ? (
         <p className="mb-4 text-sm text-muted">
           {total.toLocaleString("fa-IR")} نتیجه برای «{q}»{" "}
-          <Link href={link({ q: undefined })} className="text-accent hover:underline">
+          <Link href={link({ q: undefined })} className="text-accent underline underline-offset-4">
             پاک کردن جستجو
           </Link>
         </p>
       ) : null}
       {products.length === 0 ? <p className="py-16 text-center text-muted">محصولی یافت نشد.</p> : null}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4">
-        {products.map((p) => (
-          <ProductCard key={p.id} product={p} />
+        {products.map((p, i) => (
+          // The first row is on screen at load: its photos (the likely LCP) skip lazy loading.
+          <ProductCard key={p.id} product={p} eager={i < 4} />
         ))}
       </div>
 

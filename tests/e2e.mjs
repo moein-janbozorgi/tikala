@@ -303,7 +303,9 @@ const product = { name: "کلاه زمستانی", price: 300000, category: "ا�
 r = await submitForm("/admin/products/new", 'name="imageFile"', { ...product, imageFile: new File(["<svg onload=alert(1)>"], "evil.png", { type: "image/png" }) });
 check(decodeURIComponent(r.location ?? "").includes("فقط تصویر"), "upload of a non-image is refused");
 r = await submitForm("/admin/products/new", 'name="imageFile"', { ...product, imageFile: new File([png], "hat.png", { type: "image/png" }) });
-const uploaded = (await get("/admin/products")).html.match(/src="(\/uploads\/[0-9a-f-]{36}\.webp)"/)?.[1];
+// Shop pages show it through Next's resizer (/_next/image?url=%2Fuploads%2F…); the stored original is checked here.
+const uploadedName = (await get("/admin/products")).html.match(/url=%2Fuploads%2F([0-9a-f-]{36}\.webp)/)?.[1];
+const uploaded = uploadedName && `/uploads/${uploadedName}`;
 const served = uploaded ? await fetch(base + uploaded) : null;
 const servedMeta = served?.ok ? await sharp(Buffer.from(await served.arrayBuffer())).metadata() : null;
 check(r.location === "/admin/products" && served?.headers.get("content-type") === "image/webp" && servedMeta?.width === 1200 && servedMeta?.height === 800, "uploaded photo stored as WebP, shrunk to 1200px wide");

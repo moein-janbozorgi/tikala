@@ -55,7 +55,7 @@ export function ProductForm({ product, variants = [] }: { product?: Product; var
       <fieldset className="space-y-3 rounded-xl border border-line p-3">
         <legend className="px-1 text-sm">تصویر محصول</legend>
         <div className="flex items-center gap-3">
-          {product?.image ? <ProductImage src={product.image} alt="" className="size-16 shrink-0 rounded-lg" /> : null}
+          {product?.image ? <ProductImage src={product.image} alt="" sizes="64px" className="size-16 shrink-0 rounded-lg" /> : null}
           <label className="block flex-1">
             <span className="mb-1 block text-xs text-muted">بارگذاری فایل (JPG، PNG یا WEBP، حداکثر ۵ مگابایت)</span>
             <input name="imageFile" type="file" accept="image/jpeg,image/png,image/webp" data-check="image" className="input text-sm file:me-3 file:rounded-full file:border-0 file:bg-surface-2 file:px-3 file:py-1" />
@@ -92,7 +92,7 @@ export function ProductForm({ product, variants = [] }: { product?: Product; var
           <ul className="flex flex-wrap gap-3">
             {photos.map((p) => (
               <li key={p.id} className="w-24 space-y-1 text-center text-xs text-muted">
-                <ProductImage src={p.path} alt="" className="size-24 rounded-lg" />
+                <ProductImage src={p.path} alt="" sizes="96px" className="size-24 rounded-lg" />
                 <input name={`photo_color_${p.id}`} defaultValue={p.color} list="photo-colors" maxLength={20} placeholder="رنگ" aria-label="رنگ تصویر" className="input px-2 py-1 text-xs" />
                 <label className="flex cursor-pointer items-center justify-center gap-1 has-checked:text-danger">
                   <input type="checkbox" name="remove_photo" value={p.id} />

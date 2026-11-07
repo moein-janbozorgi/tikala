@@ -72,7 +72,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
         {products.map((p) => (
           <li key={p.id} className="flex flex-wrap items-center gap-3 p-3">
             <Link href={`/admin/products/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-              <ProductImage src={p.image} alt="" className="size-14 shrink-0 rounded-xl" />
+              <ProductImage src={p.image} alt="" sizes="56px" className="size-14 shrink-0 rounded-xl" />
               <span className="min-w-0">
                 <span className="flex flex-wrap items-center gap-1.5 font-medium">
                   {p.name}

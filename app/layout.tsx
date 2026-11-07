@@ -82,7 +82,7 @@ export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
               ) : null}
               {user ? (
                 <>
-                  <Link href="/account" className="flex items-center gap-1.5 rounded-full px-3 py-2 hover:bg-surface-2" aria-label="حساب کاربری">
+                  <Link href="/account" className="flex items-center gap-1.5 rounded-full px-3 py-2 hover:bg-surface-2" aria-label={`حساب کاربری ${user.name}`}>
                     <UserIcon />
                     <span className="hidden sm:inline">{user.name}</span>
                   </Link>

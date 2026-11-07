@@ -6,7 +6,7 @@ import { BagIcon } from "./icons";
 import { ProductImage } from "./product-image";
 
 /** A product in the shop grid, with a buy button (sizes and colors are picked on the product page). Rendered by the home page and by LoadMore. */
-export function ProductCard({ product: p }: { product: ProductWithStock }) {
+export function ProductCard({ product: p, eager = false }: { product: ProductWithStock; eager?: boolean }) {
   const { variants } = p;
   return (
     <article className="group flex flex-col rounded-2xl border border-line bg-surface p-2 sm:p-2.5">
@@ -15,6 +15,8 @@ export function ProductCard({ product: p }: { product: ProductWithStock }) {
           <ProductImage
             src={p.image}
             alt={p.name}
+            sizes="(min-width: 1152px) 270px, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+            eager={eager}
             className={`aspect-4/5 w-full transition duration-500 group-hover:scale-105 ${variants.length ? "" : "opacity-60 grayscale"}`}
           />
           {p.subcategory ? (
