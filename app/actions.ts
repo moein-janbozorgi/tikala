@@ -27,14 +27,14 @@ export async function addToCart(form: FormData) {
   const productId = Number(form.get("productId"));
   let variantId = Number(form.get("variantId"));
   if (productId) {
-    const row = db.prepare("SELECT id FROM variants WHERE product_id = ? AND size = ? AND color = ?").get(productId, str(form, "size"), str(form, "color")) as
+    const row = (await db.prepare("SELECT id FROM variants WHERE product_id = ? AND size = ? AND color = ?").get(productId, str(form, "size"), str(form, "color"))) as
       | { id: number }
       | undefined;
     if (!row) fail(`/product/${productId}`, "این سایز در این رنگ موجود نیست");
     variantId = row!.id;
   }
   const qty = Math.max(1, Math.floor(Number(form.get("qty"))) || 1);
-  const variant = db.prepare("SELECT v.product_id, v.stock FROM variants v JOIN products p ON p.id = v.product_id WHERE v.id = ? AND p.active = 1").get(variantId) as
+  const variant = (await db.prepare("SELECT v.product_id, v.stock FROM variants v JOIN products p ON p.id = v.product_id WHERE v.id = ? AND p.active = 1").get(variantId)) as
     | { product_id: number; stock: number }
     | undefined;
   if (!variant) fail("/", "این کالا پیدا نشد");
@@ -48,7 +48,7 @@ export async function addToCart(form: FormData) {
 export async function updateCartItem(form: FormData) {
   const variantId = String(Number(form.get("variantId")));
   // Never more than is in stock, and only real variants: anything else would just grow the cart cookie.
-  const stock = (db.prepare("SELECT stock FROM variants WHERE id = ?").get(Number(variantId)) as { stock: number } | undefined)?.stock ?? 0;
+  const stock = ((await db.prepare("SELECT stock FROM variants WHERE id = ?").get(Number(variantId))) as { stock: number } | undefined)?.stock ?? 0;
   const qty = Math.min(stock, Math.floor(Number(form.get("qty"))) || 0);
   const cart = await getCart();
   if (qty > 0) cart[variantId] = qty;
@@ -88,7 +88,7 @@ export async function checkout(form: FormData) {
 
   let orderId = 0;
   try {
-    orderId = placeOrder(user.id, await getCart(), info, payment, await getCouponCode());
+    orderId = await placeOrder(user.id, await getCart(), info, payment, await getCouponCode());
   } catch (e) {
     await reject(e instanceof Error ? e.message : "خطا در ثبت سفارش");
   }
@@ -105,7 +105,7 @@ export async function applyCoupon(form: FormData) {
   const code = form.has("remove") ? "" : normalizeCoupon(form.get("code"));
   if (code) {
     const subtotal = (await getCartLines()).reduce((sum, l) => sum + l.price * l.qty, 0);
-    const result = couponDiscount(code, subtotal);
+    const result = await couponDiscount(code, subtotal);
     if ("error" in result) fail("/cart", result.error);
   }
   await setCouponCode(code);
@@ -117,8 +117,8 @@ export async function cancelMyOrder(form: FormData) {
   const user = await requireUser("/account");
   const orderId = Number(form.get("orderId"));
   let problem = "";
-  transaction(() => {
-    const order = db.prepare("SELECT status, payment FROM orders WHERE id = ? AND user_id = ?").get(orderId, user.id) as
+  await transaction(async () => {
+    const order = (await db.prepare("SELECT status, payment FROM orders WHERE id = ? AND user_id = ?").get(orderId, user.id)) as
       | { status: string; payment: string }
       | undefined;
     // Checked inside the transaction, so the admin can't start processing it in between.
@@ -126,7 +126,7 @@ export async function cancelMyOrder(form: FormData) {
     // A paid online order would need a refund, which only the shop can do.
     else if (order.status === "pending" && order.payment === "online") problem = "سفارش پرداخت‌شده را فقط فروشگاه می‌تواند لغو کند؛ با پشتیبانی تماس بگیرید";
     else if (order.status !== "pending" && order.status !== "awaiting_payment") problem = "این سفارش دیگر قابل لغو نیست";
-    else cancelOrder(orderId);
+    else await cancelOrder(orderId);
   });
   if (problem) fail("/account", problem);
   redirect("/account?cancelled=1");
@@ -137,7 +137,7 @@ export async function payOrder(form: FormData) {
   const user = await requireUser("/account");
   const orderId = Number(form.get("orderId"));
   // Only the owner may pay; startPayment checks the order is still awaiting payment.
-  if (!db.prepare("SELECT 1 FROM orders WHERE id = ? AND user_id = ?").get(orderId, user.id)) fail("/account", "سفارش پیدا نشد");
+  if (!await db.prepare("SELECT 1 FROM orders WHERE id = ? AND user_id = ?").get(orderId, user.id)) fail("/account", "سفارش پیدا نشد");
   await goToGateway(orderId);
 }
 
@@ -171,16 +171,16 @@ export async function register(form: FormData) {
   // "Already registered" tells whether an email has an account, so trying taken emails counts like a failed login:
   // one IP can't check more than a handful of emails.
   const ip = await clientIp();
-  if (loginLocked(email, ip)) await reject(LOCKED);
+  if (await loginLocked(email, ip)) await reject(LOCKED);
   const taken = "این ایمیل قبلاً ثبت شده است";
-  if (db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) {
-    recordLoginFailure(email, ip);
+  if (await db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) {
+    await recordLoginFailure(email, ip);
     await reject(taken);
   }
 
   let userId = 0;
   try {
-    userId = (db.prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?) RETURNING id").get(name, email, await hashPassword(password)) as { id: number }).id;
+    userId = ((await db.prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?) RETURNING id").get(name, email, await hashPassword(password))) as { id: number }).id;
   } catch {
     // Two sign-ups with the same email at once: the UNIQUE constraint catches the one the check above missed.
     await reject(taken);
@@ -200,16 +200,16 @@ export async function login(form: FormData) {
   const password = String(form.get("password") ?? "");
   // Checked before the password, and unknown emails count too, so the lock reveals nothing about which accounts exist.
   const ip = await clientIp();
-  if (loginLocked(email, ip)) authFail(back, LOCKED);
-  const user = db.prepare("SELECT id, password_hash FROM users WHERE email = ?").get(email) as
+  if (await loginLocked(email, ip)) authFail(back, LOCKED);
+  const user = (await db.prepare("SELECT id, password_hash FROM users WHERE email = ?").get(email)) as
     | { id: number; password_hash: string | null }
     | undefined;
   // Accounts created by phone have no password until the owner sets one in their account page.
   if (!user?.password_hash || password.length > 64 || !(await verifyPassword(password, user.password_hash))) {
-    recordLoginFailure(email, ip);
+    await recordLoginFailure(email, ip);
     authFail(back, "ایمیل یا رمز عبور اشتباه است");
   }
-  clearLoginFailures(email);
+  await clearLoginFailures(email);
   await startSession(user!.id);
   redirect(next);
 }
@@ -229,12 +229,12 @@ export async function requestCode(form: FormData) {
   const reject = (message: string) => (purpose === "link" ? fail(from, message) : authFail(authUrl(from, { auth: "login", next }), message));
   const phone = normalizePhone(str(form, "phone"));
   if (!phone) reject("شماره موبایل معتبر نیست (مثال: ۰۹۱۲۱۲۳۴۵۶۷)");
-  if (purpose === "link" && db.prepare("SELECT 1 FROM users WHERE phone = ?").get(phone)) reject("این شماره برای حساب دیگری ثبت شده است");
-  if (!smsAllowedForIp(await clientIp())) reject("تعداد درخواست کد از این دستگاه بیش از حد مجاز است؛ یک ساعت دیگر تلاش کنید");
+  if (purpose === "link" && await db.prepare("SELECT 1 FROM users WHERE phone = ?").get(phone)) reject("این شماره برای حساب دیگری ثبت شده است");
+  if (!await smsAllowedForIp(await clientIp())) reject("تعداد درخواست کد از این دستگاه بیش از حد مجاز است؛ یک ساعت دیگر تلاش کنید");
 
   let error = "";
   try {
-    const code = createCode(phone!);
+    const code = await createCode(phone!);
     // No real SMS (dev / SMS_CONSOLE=1): hand the code to the verify modal to show on screen.
     if (await sendLoginCode(phone!, code)) await setFlash("otp", { phone: phone!, code });
   } catch (e) {
@@ -252,30 +252,30 @@ export async function verifyCode(form: FormData) {
   const phone = normalizePhone(str(form, "phone"));
   if (!phone) authFail(authUrl(from, { auth: "login", next }), "شماره موبایل معتبر نیست");
   const back = authUrl(from, { auth: "verify", mobile: phone!, next, purpose });
-  const codeError = checkCode(phone!, toLatinDigits(str(form, "code")));
+  const codeError = await checkCode(phone!, toLatinDigits(str(form, "code")));
   if (codeError) authFail(back, codeError);
 
   if (purpose === "link") {
     const user = await requireUser("/account");
     let taken = false;
     try {
-      db.prepare("UPDATE users SET phone = ? WHERE id = ?").run(phone, user.id);
+      await db.prepare("UPDATE users SET phone = ? WHERE id = ?").run(phone, user.id);
     } catch {
       taken = true; // UNIQUE: someone else verified this number in the meantime
     }
-    consumeCode(phone!);
+    await consumeCode(phone!);
     redirect(taken ? `/account?error=${errorParam("این شماره برای حساب دیگری ثبت شده است")}` : "/account?phone=1");
   }
 
-  let user = db.prepare("SELECT id FROM users WHERE phone = ?").get(phone) as { id: number } | undefined;
+  let user = (await db.prepare("SELECT id FROM users WHERE phone = ?").get(phone)) as { id: number } | undefined;
   if (!user) {
     // New number: the code was right, but it stays valid until the name is fixed, so a typo doesn't cost a new SMS.
     const name = str(form, "name").replace(/\s+/g, " ");
     const nameError = nameProblem(name);
     if (nameError) authFail(back, `برای ساخت حساب جدید نام را وارد کنید: ${nameError}`);
-    user = db.prepare("INSERT INTO users (name, phone) VALUES (?, ?) ON CONFLICT (phone) DO UPDATE SET phone = phone RETURNING id").get(name, phone) as { id: number };
+    user = (await db.prepare("INSERT INTO users (name, phone) VALUES (?, ?) ON CONFLICT (phone) DO UPDATE SET phone = phone RETURNING id").get(name, phone)) as { id: number };
   }
-  consumeCode(phone!);
+  await consumeCode(phone!);
   await startSession(user.id);
   redirect(next);
 }
@@ -286,9 +286,9 @@ export async function setPassword(form: FormData) {
   if (!user.email) fail("/account", "برای ورود با رمز عبور، حساب باید ایمیل داشته باشد");
   const problem = passwordProblem(String(form.get("password") ?? ""), String(form.get("confirm") ?? ""));
   if (problem) fail("/account", problem);
-  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(await hashPassword(String(form.get("password"))), user.id);
+  await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(await hashPassword(String(form.get("password"))), user.id);
   await endOtherSessions(user.id);
-  clearLoginFailures(user.email!);
+  await clearLoginFailures(user.email!);
   redirect("/account?password=1");
 }
 

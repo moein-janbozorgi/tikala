@@ -10,12 +10,12 @@ const persianMonth = new Intl.DateTimeFormat("fa-IR-u-ca-persian", { year: "nume
 /** Sales per day (last 30 days), per Persian-calendar month (last year), and the best sellers. Sold = not cancelled or unpaid. */
 export default async function AdminReportsPage() {
   await requireAdmin();
-  const days = db
+  const days = (await db
     .prepare(
       `SELECT date(created_at, ${TEHRAN}) AS day, COUNT(*) AS orders, SUM(total) AS revenue FROM orders
        WHERE ${SOLD} AND created_at >= datetime('now', '-400 days') GROUP BY day ORDER BY day DESC`,
     )
-    .all() as Day[];
+    .all()) as Day[];
   // Persian months don't line up with Gregorian ones, so days are grouped in JavaScript by their Persian month.
   const months: { month: string; orders: number; revenue: number }[] = [];
   for (const d of days) {
@@ -26,13 +26,13 @@ export default async function AdminReportsPage() {
   }
   const since30 = new Date(Date.now() + 210 * 60_000 - 29 * 86_400_000).toISOString().slice(0, 10);
   const last30 = days.filter((d) => d.day >= since30);
-  const best = db
+  const best = (await db
     .prepare(
       `SELECT product_name AS name, SUM(qty) AS qty, SUM(price * qty) AS revenue FROM order_items
        WHERE order_id IN (SELECT id FROM orders WHERE ${SOLD})
        GROUP BY product_name ORDER BY qty DESC, revenue DESC LIMIT 10`,
     )
-    .all() as { name: string; qty: number; revenue: number }[];
+    .all()) as { name: string; qty: number; revenue: number }[];
   const sum30 = last30.reduce((a, d) => ({ orders: a.orders + d.orders, revenue: a.revenue + d.revenue }), { orders: 0, revenue: 0 });
   const th = "px-3 py-2 text-start font-medium text-muted";
   const td = "px-3 py-2";

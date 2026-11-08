@@ -23,7 +23,7 @@ async function call(path: string, body: object) {
 
 /** Asks Zarinpal for a payment session for an awaiting_payment order and returns the URL to send the customer to. */
 export async function startPayment(orderId: number, origin: string) {
-  const order = db.prepare("SELECT id, total, phone FROM orders WHERE id = ? AND status = 'awaiting_payment'").get(orderId) as
+  const order = (await db.prepare("SELECT id, total, phone FROM orders WHERE id = ? AND status = 'awaiting_payment'").get(orderId)) as
     | { id: number; total: number; phone: string }
     | undefined;
   if (!order) throw new Error("این سفارش در انتظار پرداخت نیست");
@@ -37,7 +37,7 @@ export async function startPayment(orderId: number, origin: string) {
   });
   if (data.code !== 100 || !data.authority) throw new Error(`خطا در اتصال به درگاه پرداخت (کد ${errorCode ?? data.code ?? "نامشخص"})`);
   // A retry gets a new authority; the old one stops matching, so its callback is ignored.
-  db.prepare("UPDATE orders SET authority = ? WHERE id = ?").run(data.authority, order.id);
+  await db.prepare("UPDATE orders SET authority = ? WHERE id = ?").run(data.authority, order.id);
   return `${host}/pg/StartPay/${data.authority}`;
 }
 

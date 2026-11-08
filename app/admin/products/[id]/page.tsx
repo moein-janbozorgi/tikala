@@ -11,9 +11,9 @@ export default async function EditProductPage({ params, searchParams }: PageProp
   await requireAdmin();
   const { id } = await params;
   const { error } = await searchParams;
-  const product = db.prepare("SELECT * FROM products WHERE id = ?").get(Number(id)) as Product | undefined;
+  const product = (await db.prepare("SELECT * FROM products WHERE id = ?").get(Number(id))) as Product | undefined;
   if (!product) notFound();
-  const variants = db.prepare("SELECT * FROM variants WHERE product_id = ? ORDER BY id").all(product.id) as Variant[];
+  const variants = (await db.prepare("SELECT * FROM variants WHERE product_id = ? ORDER BY id").all(product.id)) as Variant[];
 
   return (
     <div className="max-w-2xl space-y-4">

@@ -25,14 +25,14 @@ export async function saveProduct(form: FormData) {
   const variants = String(form.get("variants") ?? "");
   let image = String(form.get("image") ?? "").trim();
   const back = id ? `/admin/products/${id}` : "/admin/products/new";
-  if (id && !db.prepare("SELECT 1 FROM products WHERE id = ?").get(id)) fail("/admin/products", "این محصول پیدا نشد");
+  if (id && !await db.prepare("SELECT 1 FROM products WHERE id = ?").get(id)) fail("/admin/products", "این محصول پیدا نشد");
   // The category field is free text, so a new name must pass the same rule as the categories page.
   const problem =
     productProblem({ name, price, compare_price: comparePrice, description, subcategory, image }) ?? (category ? categoryProblem(category) : null) ?? variantsProblem(variants);
   if (problem) fail(back, problem);
   // Extra photos: the ones ticked for removal go, new uploads are added, at most MAX_PHOTOS in all.
   const removed = form.getAll("remove_photo").map(Number);
-  const keptPhotos = id ? (db.prepare("SELECT id FROM product_images WHERE product_id = ?").all(id) as { id: number }[]).filter((p) => !removed.includes(p.id)).length : 0;
+  const keptPhotos = id ? ((await db.prepare("SELECT id FROM product_images WHERE product_id = ?").all(id)) as { id: number }[]).filter((p) => !removed.includes(p.id)).length : 0;
   const newPhotos = form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
   if (keptPhotos + newPhotos.length > MAX_PHOTOS) fail(back, `حداکثر ${MAX_PHOTOS.toLocaleString("fa-IR")} تصویر اضافه برای هر محصول`);
   // Photo colors: "photo_color_<id>" for kept photos, "photos_color" for the new uploads; same 20-character limit as variant colors.
@@ -56,18 +56,18 @@ export async function saveProduct(form: FormData) {
 
   const values = [name, description, category, subcategory, price, comparePrice, image, form.get("active") ? 1 : 0];
   const gone: string[] = [];
-  transaction(() => {
+  await transaction(async () => {
     const productId = id
-      ? (db.prepare("UPDATE products SET name=?, description=?, category=?, subcategory=?, price=?, compare_price=?, image=?, active=? WHERE id=?").run(...values, id), id)
-      : (db.prepare("INSERT INTO products (name, description, category, subcategory, price, compare_price, image, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").get(...values) as { id: number }).id;
-    saveVariants(productId, variants);
-    if (category) db.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(category);
+      ? (await db.prepare("UPDATE products SET name=?, description=?, category=?, subcategory=?, price=?, compare_price=?, image=?, active=? WHERE id=?").run(...values, id), id)
+      : ((await db.prepare("INSERT INTO products (name, description, category, subcategory, price, compare_price, image, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").get(...values)) as { id: number }).id;
+    await saveVariants(productId, variants);
+    if (category) await db.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(category);
     for (const photoId of removed) {
-      const row = db.prepare("DELETE FROM product_images WHERE id = ? AND product_id = ? RETURNING path").get(photoId, productId) as { path: string } | undefined;
+      const row = (await db.prepare("DELETE FROM product_images WHERE id = ? AND product_id = ? RETURNING path").get(photoId, productId)) as { path: string } | undefined;
       if (row) gone.push(row.path);
     }
-    for (const p of photoColors) db.prepare("UPDATE product_images SET color = ? WHERE id = ? AND product_id = ?").run(p.color, p.id, productId);
-    for (const path of photoPaths) db.prepare("INSERT INTO product_images (product_id, path, color) VALUES (?, ?, ?)").run(productId, path, newColor);
+    for (const p of photoColors) await db.prepare("UPDATE product_images SET color = ? WHERE id = ? AND product_id = ?").run(p.color, p.id, productId);
+    for (const path of photoPaths) await db.prepare("INSERT INTO product_images (product_id, path, color) VALUES (?, ?, ?)").run(productId, path, newColor);
   });
   await deleteUnusedUploads(gone);
   redirect("/admin/products");
@@ -77,16 +77,17 @@ const MAX_PHOTOS = 8;
 
 /** Deletes the files of photos no product shows any more. */
 async function deleteUnusedUploads(paths: string[]) {
-  const unused = paths.filter((p) => !db.prepare("SELECT 1 FROM products WHERE image = ? UNION SELECT 1 FROM product_images WHERE path = ?").get(p, p));
-  await Promise.all(unused.map(deleteUpload));
+  for (const p of paths) {
+    if (!(await db.prepare("SELECT 1 FROM products WHERE image = ? UNION SELECT 1 FROM product_images WHERE path = ?").get(p, p))) await deleteUpload(p);
+  }
 }
 
 /** Deletes a product, its variants and its photo files. Past orders keep their own copy of the name, size, color and price. */
 export async function deleteProduct(form: FormData) {
   await requireAdmin();
   const id = Number(form.get("id"));
-  const photos = (db.prepare("SELECT image AS path FROM products WHERE id = ? UNION SELECT path FROM product_images WHERE product_id = ?").all(id, id) as { path: string }[]).map((r) => r.path);
-  db.prepare("DELETE FROM products WHERE id = ?").run(id);
+  const photos = ((await db.prepare("SELECT image AS path FROM products WHERE id = ? UNION SELECT path FROM product_images WHERE product_id = ?").all(id, id)) as { path: string }[]).map((r) => r.path);
+  await db.prepare("DELETE FROM products WHERE id = ?").run(id);
   await deleteUnusedUploads(photos);
   redirect("/admin/products?deleted=1");
 }
@@ -98,7 +99,7 @@ export async function addCategory(form: FormData) {
   const name = text(form, "name");
   const problem = categoryProblem(name);
   if (problem) fail("/admin/categories", problem);
-  if (!db.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(name).changes) fail("/admin/categories", "این دسته‌بندی از قبل وجود دارد");
+  if (!(await db.prepare("INSERT OR IGNORE INTO categories (name) VALUES (?)").run(name)).changes) fail("/admin/categories", "این دسته‌بندی از قبل وجود دارد");
   redirect("/admin/categories?saved=1");
 }
 
@@ -110,10 +111,10 @@ export async function renameCategory(form: FormData) {
   const problem = categoryProblem(to);
   if (problem) fail("/admin/categories", problem);
   if (to === from) redirect("/admin/categories");
-  if (db.prepare("SELECT 1 FROM categories WHERE name = ?").get(to)) fail("/admin/categories", "دسته‌بندی دیگری با این نام وجود دارد");
-  transaction(() => {
-    db.prepare("UPDATE categories SET name = ? WHERE name = ?").run(to, from);
-    db.prepare("UPDATE products SET category = ? WHERE category = ?").run(to, from);
+  if (await db.prepare("SELECT 1 FROM categories WHERE name = ?").get(to)) fail("/admin/categories", "دسته‌بندی دیگری با این نام وجود دارد");
+  await transaction(async () => {
+    await db.prepare("UPDATE categories SET name = ? WHERE name = ?").run(to, from);
+    await db.prepare("UPDATE products SET category = ? WHERE category = ?").run(to, from);
   });
   redirect("/admin/categories?saved=1");
 }
@@ -124,7 +125,7 @@ export async function setSizeGuide(form: FormData) {
   const name = text(form, "name");
   const guide = String(form.get("size_guide") ?? "").replace(/\r/g, "").trim();
   if (guide.length > 2000 || guide.split("\n").length > 40) fail("/admin/categories", "راهنمای سایز حداکثر ۴۰ خط و ۲۰۰۰ کاراکتر است");
-  db.prepare("UPDATE categories SET size_guide = ? WHERE name = ?").run(guide, name);
+  await db.prepare("UPDATE categories SET size_guide = ? WHERE name = ?").run(guide, name);
   redirect("/admin/categories?saved=1");
 }
 
@@ -132,8 +133,8 @@ export async function setSizeGuide(form: FormData) {
 export async function deleteCategory(form: FormData) {
   await requireAdmin();
   const name = text(form, "name");
-  if (db.prepare("SELECT 1 FROM products WHERE category = ?").get(name)) fail("/admin/categories", "ابتدا محصولات این دسته‌بندی را حذف کنید یا به دسته دیگری ببرید");
-  db.prepare("DELETE FROM categories WHERE name = ?").run(name);
+  if (await db.prepare("SELECT 1 FROM products WHERE category = ?").get(name)) fail("/admin/categories", "ابتدا محصولات این دسته‌بندی را حذف کنید یا به دسته دیگری ببرید");
+  await db.prepare("DELETE FROM categories WHERE name = ?").run(name);
   redirect("/admin/categories?saved=1");
 }
 
@@ -149,14 +150,14 @@ export async function setOrderStatus(form: FormData) {
   if (form.has("tracking_code")) {
     const tracking = toLatinDigits(String(form.get("tracking_code"))).replace(/\s/g, "").toUpperCase();
     if (tracking && !/^[A-Z0-9-]{6,30}$/.test(tracking)) fail(safeBack, "کد رهگیری باید ۶ تا ۳۰ حرف انگلیسی یا عدد باشد");
-    db.prepare("UPDATE orders SET tracking_code = ? WHERE id = ?").run(tracking, id);
+    await db.prepare("UPDATE orders SET tracking_code = ? WHERE id = ?").run(tracking, id);
   }
-  if (status === "cancelled") cancelOrder(id);
+  if (status === "cancelled") await cancelOrder(id);
   // Cancelled is final: its stock was already returned. "Awaiting payment" is only ever set by checkout: set by hand,
   // the order would be auto-cancelled 30 minutes after it was placed. Only a real change counts, so re-saving doesn't
   // text the customer again.
   else if (status in ORDER_STATUSES && status !== "awaiting_payment") {
-    const changed = db.prepare("UPDATE orders SET status = ? WHERE id = ? AND status NOT IN ('cancelled', ?)").run(status, id, status).changes;
+    const changed = (await db.prepare("UPDATE orders SET status = ? WHERE id = ? AND status NOT IN ('cancelled', ?)").run(status, id, status)).changes;
     if (changed && status === "shipped") after(() => notifyOrder(id, "shipped"));
   }
   redirect(safeBack);
@@ -165,7 +166,7 @@ export async function setOrderStatus(form: FormData) {
 export async function deleteOrder(form: FormData) {
   await requireAdmin();
   const back = String(form.get("back") ?? "");
-  purgeOrder(Number(form.get("id")));
+  await purgeOrder(Number(form.get("id")));
   redirect(back.startsWith("/admin") ? back : "/admin");
 }
 
@@ -185,9 +186,9 @@ export async function addCoupon(form: FormData) {
   };
   const problem = couponProblem(coupon);
   if (problem) fail("/admin/coupons", problem);
-  const added = db
+  const added = (await db
     .prepare("INSERT OR IGNORE INTO coupons (code, percent, amount, min_total, max_uses, expires_on) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(coupon.code, coupon.percent, coupon.amount, coupon.min_total, coupon.max_uses, coupon.expires_on).changes;
+    .run(coupon.code, coupon.percent, coupon.amount, coupon.min_total, coupon.max_uses, coupon.expires_on)).changes;
   if (!added) fail("/admin/coupons", "این کد تخفیف از قبل وجود دارد");
   redirect("/admin/coupons?saved=1");
 }
@@ -195,13 +196,13 @@ export async function addCoupon(form: FormData) {
 /** Turns a code on or off; off codes are refused at checkout but kept, with their usage count. */
 export async function toggleCoupon(form: FormData) {
   await requireAdmin();
-  db.prepare("UPDATE coupons SET active = 1 - active WHERE code = ?").run(String(form.get("code") ?? ""));
+  await db.prepare("UPDATE coupons SET active = 1 - active WHERE code = ?").run(String(form.get("code") ?? ""));
   redirect("/admin/coupons");
 }
 
 /** Deletes a code. Orders that used it keep its name and the discount they got. */
 export async function deleteCoupon(form: FormData) {
   await requireAdmin();
-  db.prepare("DELETE FROM coupons WHERE code = ?").run(String(form.get("code") ?? ""));
+  await db.prepare("DELETE FROM coupons WHERE code = ?").run(String(form.get("code") ?? ""));
   redirect("/admin/coupons");
 }

@@ -11,8 +11,8 @@ import { SubmitButton } from "../submit-button";
 export default async function AccountPage({ searchParams }: PageProps<"/account">) {
   const user = await requireUser("/account");
   const { order, paid, error, phone, password, cancelled } = await searchParams;
-  expireUnpaidOrders();
-  const orders = db.prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC").all(user.id) as Order[];
+  await expireUnpaidOrders();
+  const orders = (await db.prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC").all(user.id)) as Order[];
 
   return (
     <div className="space-y-4">

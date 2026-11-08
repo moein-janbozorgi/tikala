@@ -30,21 +30,21 @@ export async function verifyPassword(password: string, stored: string) {
 const LOCK_WINDOW = 15 * 60 * 1000;
 const MAX_PER_EMAIL_AND_IP = 5;
 const MAX_PER_IP = 20;
-const count = (sql: string, ...args: (string | number)[]) => (db.prepare(`SELECT COUNT(*) AS n FROM login_failures WHERE ${sql}`).get(...args) as { n: number }).n;
+const count = async (sql: string, ...args: (string | number)[]) => ((await db.prepare(`SELECT COUNT(*) AS n FROM login_failures WHERE ${sql}`).get(...args)) as { n: number }).n;
 
 /** Login throttle: true after 5 failures for this email from this IP, or 20 from this IP, in the last 15 minutes. */
-export function loginLocked(email: string, ip: string, now = Date.now()) {
+export async function loginLocked(email: string, ip: string, now = Date.now()) {
   const since = now - LOCK_WINDOW;
-  return count("email = ? AND ip = ? AND at > ?", email, ip, since) >= MAX_PER_EMAIL_AND_IP || count("ip = ? AND at > ?", ip, since) >= MAX_PER_IP;
+  return (await count("email = ? AND ip = ? AND at > ?", email, ip, since)) >= MAX_PER_EMAIL_AND_IP || (await count("ip = ? AND at > ?", ip, since)) >= MAX_PER_IP;
 }
 
-export function recordLoginFailure(email: string, ip: string, now = Date.now()) {
+export async function recordLoginFailure(email: string, ip: string, now = Date.now()) {
   // Expired rows are useless, so each new failure clears them; the table stays small.
-  db.prepare("DELETE FROM login_failures WHERE at <= ?").run(now - LOCK_WINDOW);
-  db.prepare("INSERT INTO login_failures (email, ip, at) VALUES (?, ?, ?)").run(email, ip, now);
+  await db.prepare("DELETE FROM login_failures WHERE at <= ?").run(now - LOCK_WINDOW);
+  await db.prepare("INSERT INTO login_failures (email, ip, at) VALUES (?, ?, ?)").run(email, ip, now);
 }
 
 /** After a successful login or a new password: unlock this email from every IP. */
-export function clearLoginFailures(email: string) {
-  db.prepare("DELETE FROM login_failures WHERE email = ?").run(email);
+export async function clearLoginFailures(email: string) {
+  await db.prepare("DELETE FROM login_failures WHERE email = ?").run(email);
 }

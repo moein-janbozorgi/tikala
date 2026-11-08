@@ -14,9 +14,9 @@ type Item = { id: number; product_name: string; size: string; color: string; pri
 /** One-page invoice / packing slip to print and put in the parcel. */
 export default async function InvoicePage({ params }: PageProps<"/admin/orders/[id]/invoice">) {
   await requireAdmin();
-  const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(Number((await params).id)) as Order | undefined;
+  const order = (await db.prepare("SELECT * FROM orders WHERE id = ?").get(Number((await params).id))) as Order | undefined;
   if (!order) notFound();
-  const items = db.prepare("SELECT * FROM order_items WHERE order_id = ? ORDER BY id").all(order.id) as Item[];
+  const items = (await db.prepare("SELECT * FROM order_items WHERE order_id = ? ORDER BY id").all(order.id)) as Item[];
   const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0);
   const shipping = order.total - subtotal + order.discount;
   const cell = "border border-line px-3 py-2";

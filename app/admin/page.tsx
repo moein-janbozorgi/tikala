@@ -15,7 +15,7 @@ const STEPS = ["pending", "processing", "shipped", "delivered"];
 
 export default async function AdminOrdersPage({ searchParams }: PageProps<"/admin">) {
   await requireAdmin();
-  expireUnpaidOrders();
+  await expireUnpaidOrders();
   const params = await searchParams;
   const status = typeof params.status === "string" && params.status in ORDER_STATUSES ? params.status : undefined;
   const q = typeof params.q === "string" ? toLatinDigits(params.q.trim()).slice(0, 50) : "";
@@ -38,27 +38,27 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
     where.push("name LIKE ? ESCAPE '\\'");
     args.push(likeContains(q));
   }
-  const matching = (db.prepare(`SELECT COUNT(*) AS n FROM orders WHERE ${where.join(" AND ")}`).get(...args) as { n: number }).n;
+  const matching = ((await db.prepare(`SELECT COUNT(*) AS n FROM orders WHERE ${where.join(" AND ")}`).get(...args)) as { n: number }).n;
   const pages = Math.max(1, Math.ceil(matching / PAGE_SIZE));
   const page = Math.min(pages, Math.max(1, Math.floor(Number(params.page)) || 1));
-  const orders = db
+  const orders = (await db
     .prepare(`SELECT * FROM orders WHERE ${where.join(" AND ")} ORDER BY id DESC LIMIT ? OFFSET ?`)
-    .all(...args, PAGE_SIZE, (page - 1) * PAGE_SIZE) as Order[];
+    .all(...args, PAGE_SIZE, (page - 1) * PAGE_SIZE)) as Order[];
   /** This list (same status filter and search) at another page. */
   const pageLink = (n: number) => `/admin?${new URLSearchParams({ ...(status ? { status } : {}), ...(q ? { q } : {}), ...(n > 1 ? { page: String(n) } : {}) })}`.replace(/\?$/, "");
   const counts = Object.fromEntries(
-    (db.prepare("SELECT status, COUNT(*) AS n FROM orders GROUP BY status").all() as { status: string; n: number }[]).map((r) => [r.status, r.n]),
+    ((await db.prepare("SELECT status, COUNT(*) AS n FROM orders GROUP BY status").all()) as { status: string; n: number }[]).map((r) => [r.status, r.n]),
   );
   const all = Object.values(counts).reduce((a, b) => a + b, 0);
-  const today = db
+  const today = (await db
     .prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(total), 0) AS sum FROM orders WHERE ${SOLD} AND date(created_at, ${TEHRAN}) = date('now', ${TEHRAN})`)
-    .get() as { n: number; sum: number };
+    .get()) as { n: number; sum: number };
   const lowStock = (
-    db
+    (await db
       .prepare(`SELECT COUNT(DISTINCT v.product_id) AS n FROM variants v JOIN products p ON p.id = v.product_id WHERE p.active = 1 AND v.stock BETWEEN 1 AND ${LOW_STOCK}`)
-      .get() as { n: number }
+      .get()) as { n: number }
   ).n;
-  const revenue = (db.prepare(`SELECT COALESCE(SUM(total), 0) AS sum FROM orders WHERE ${SOLD}`).get() as { sum: number }).sum;
+  const revenue = ((await db.prepare(`SELECT COALESCE(SUM(total), 0) AS sum FROM orders WHERE ${SOLD}`).get()) as { sum: number }).sum;
   const here = pageLink(page);
   const tab = (value: string | undefined, label: string, n: number) => (
     <Link

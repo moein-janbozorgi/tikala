@@ -198,7 +198,7 @@ async function Register({ hidden, error, loginHref }: ViewProps) {
 }
 
 async function Verify({ hidden, error, phone, purpose, loginHref }: ViewProps & { phone: string; purpose: "login" | "link" }) {
-  const wait = phone ? resendWait(phone) : 0;
+  const wait = phone ? await resendWait(phone) : 0;
   const otp = await getFlash("otp");
   const fields = (
     <>

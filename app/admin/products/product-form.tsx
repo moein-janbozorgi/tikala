@@ -8,15 +8,15 @@ import { IMAGE_PATTERN } from "@/lib/rules";
 import { MAX_PRICE } from "@/lib/validation";
 
 /** Create form when `product` is missing, edit form otherwise. */
-export function ProductForm({ product, variants = [] }: { product?: Product; variants?: Variant[] }) {
-  const categories = (db.prepare("SELECT name FROM categories ORDER BY name").all() as { name: string }[]).map((c) => c.name);
+export async function ProductForm({ product, variants = [] }: { product?: Product; variants?: Variant[] }) {
+  const categories = ((await db.prepare("SELECT name FROM categories ORDER BY name").all()) as { name: string }[]).map((c) => c.name);
   const types: Record<string, string[]> = {};
-  for (const t of db.prepare("SELECT DISTINCT category, subcategory FROM products WHERE subcategory != '' ORDER BY subcategory").all() as {
+  for (const t of (await db.prepare("SELECT DISTINCT category, subcategory FROM products WHERE subcategory != '' ORDER BY subcategory").all()) as {
     category: string;
     subcategory: string;
   }[])
     (types[t.category] ??= []).push(t.subcategory);
-  const photos = product ? (db.prepare("SELECT id, path, color FROM product_images WHERE product_id = ? ORDER BY id").all(product.id) as { id: number; path: string; color: string }[]) : [];
+  const photos = product ? ((await db.prepare("SELECT id, path, color FROM product_images WHERE product_id = ? ORDER BY id").all(product.id)) as { id: number; path: string; color: string }[]) : [];
   const colors = [...new Set(variants.map((v) => v.color))];
   return (
     <ValidatedForm action={saveProduct} className="card space-y-3">

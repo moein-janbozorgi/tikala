@@ -11,7 +11,7 @@ import { QtyStepper } from "../../qty-stepper";
 import { getProduct } from "./get-product";
 
 export async function generateMetadata({ params }: PageProps<"/product/[id]">): Promise<Metadata> {
-  const product = getProduct((await params).id);
+  const product = await getProduct((await params).id);
   if (!product) return {};
   const description = product.description.slice(0, 160) || `${product.name} — ${toman(product.price)}`;
   return {
@@ -26,13 +26,13 @@ export async function generateMetadata({ params }: PageProps<"/product/[id]">): 
 export default async function ProductPage({ params, searchParams }: PageProps<"/product/[id]">) {
   const { id } = await params;
   const { error } = await searchParams;
-  const product = getProduct(id);
+  const product = await getProduct(id);
   if (!product) notFound();
-  const variants = db.prepare("SELECT * FROM variants WHERE product_id = ? ORDER BY id").all(product.id) as Variant[];
+  const variants = (await db.prepare("SELECT * FROM variants WHERE product_id = ? ORDER BY id").all(product.id)) as Variant[];
   const firstInStock = variants.find((v) => v.stock > 0);
   const gallery = [
     { path: product.image, color: "" },
-    ...(db.prepare("SELECT path, color FROM product_images WHERE product_id = ? ORDER BY id").all(product.id) as { path: string; color: string }[]),
+    ...((await db.prepare("SELECT path, color FROM product_images WHERE product_id = ? ORDER BY id").all(product.id)) as { path: string; color: string }[]),
   ].filter((p) => p.path);
   const photos = gallery.map((p) => p.path);
   // Colors by index (CSS-safe). Picking a color shows only its photos, or only the untagged photos (data-pc="") when it
@@ -55,16 +55,16 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
   const pickerCss = colorCss + (soldOut.length ? `${soldOut.join(",")}{text-decoration:line-through;opacity:.4;pointer-events:none}` : "");
   const off = percentOff(product.price, product.compare_price);
   const sizeGuide = product.category
-    ? ((db.prepare("SELECT size_guide FROM categories WHERE name = ?").get(product.category) as { size_guide: string } | undefined)?.size_guide ?? "")
+    ? (((await db.prepare("SELECT size_guide FROM categories WHERE name = ?").get(product.category)) as { size_guide: string } | undefined)?.size_guide ?? "")
     : "";
   // Same category, in-stock ones first, closest in price.
   const related = product.category
-    ? (db
+    ? ((await db
         .prepare(
           `SELECT p.* FROM products p WHERE p.active = 1 AND p.category = ? AND p.id != ?
            ORDER BY EXISTS (SELECT 1 FROM variants v WHERE v.product_id = p.id AND v.stock > 0) DESC, ABS(p.price - ?) LIMIT 4`,
         )
-        .all(product.category, product.id, product.price) as Product[])
+        .all(product.category, product.id, product.price)) as Product[])
     : [];
   // Structured data, so Google can show the price and stock right in search results. Schema.org needs an ISO currency,
   // and the toman isn't one, so the price goes in rial (×10).

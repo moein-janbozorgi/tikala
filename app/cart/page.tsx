@@ -21,13 +21,13 @@ export default async function CartPage({ searchParams }: PageProps<"/cart">) {
   const total = lines.reduce((sum, l) => sum + l.price * l.qty, 0);
   // The applied discount code is re-checked on every visit: it may have expired or run out since.
   const coupon = await getCouponCode();
-  const couponResult = coupon && lines.length ? couponDiscount(coupon, total) : null;
+  const couponResult = coupon && lines.length ? await couponDiscount(coupon, total) : null;
   const discount = couponResult && "discount" in couponResult ? couponResult.discount : 0;
   const shipping = shippingCost(total - discount);
   // What the customer typed last time, if the server sent the form back with an error.
   // Otherwise the details of their last order, so a returning customer doesn't retype the address.
   const last = user
-    ? (db.prepare("SELECT name, phone, province, city, postal_code, address FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 1").get(user.id) as
+    ? ((await db.prepare("SELECT name, phone, province, city, postal_code, address FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 1").get(user.id)) as
         | Record<string, string>
         | undefined)
     : undefined;

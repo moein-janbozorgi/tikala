@@ -12,7 +12,7 @@ const persianDate = (ymd: string) => new Date(`${ymd}T12:00:00Z`).toLocaleDateSt
 export default async function AdminCouponsPage({ searchParams }: PageProps<"/admin/coupons">) {
   await requireAdmin();
   const { error, saved } = await searchParams;
-  const coupons = db.prepare("SELECT * FROM coupons ORDER BY created_at DESC, code").all() as Coupon[];
+  const coupons = (await db.prepare("SELECT * FROM coupons ORDER BY created_at DESC, code").all()) as Coupon[];
 
   return (
     <div className="max-w-4xl space-y-5">

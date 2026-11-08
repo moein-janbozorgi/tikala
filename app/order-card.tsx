@@ -23,8 +23,8 @@ export type Order = {
 type Item = { id: number; product_name: string; size: string; color: string; price: number; qty: number };
 
 /** Order summary shared by the customer's account page and the admin panel; `children` holds extra controls. */
-export function OrderCard({ order, children }: { order: Order; children?: React.ReactNode }) {
-  const items = db.prepare("SELECT * FROM order_items WHERE order_id = ?").all(order.id) as Item[];
+export async function OrderCard({ order, children }: { order: Order; children?: React.ReactNode }) {
+  const items = (await db.prepare("SELECT * FROM order_items WHERE order_id = ?").all(order.id)) as Item[];
   return (
     <div className="card space-y-3">
       <div className="flex flex-wrap items-center gap-3">

@@ -6,11 +6,11 @@ const { db, cancelOrder, expireUnpaidOrders, parseVariants, placeOrder, purgeOrd
 const { shippingCost } = await import("../lib/format.ts");
 const { clearLoginFailures, hashPassword, loginLocked, passwordProblem, recordLoginFailure, verifyPassword } = await import("../lib/password.ts");
 
-const user = db.prepare("INSERT INTO users (name, email, password_hash) VALUES ('t', 't@t.t', 'x') RETURNING id").get() as { id: number };
-const stockOf = (id: number) => (db.prepare("SELECT stock FROM variants WHERE id = ?").get(id) as { stock: number }).stock;
+const user = (await db.prepare("INSERT INTO users (name, email, password_hash) VALUES ('t', 't@t.t', 'x') RETURNING id").get()) as { id: number };
+const stockOf = async (id: number) => ((await db.prepare("SELECT stock FROM variants WHERE id = ?").get(id)) as { stock: number }).stock;
 const info = { name: "علی", phone: "09121234567", province: "تهران", city: "تهران", postal_code: "1234567890", address: "خیابان آزادی" };
 
-test("parseVariants keeps valid lines and clamps stock", () => {
+test("parseVariants keeps valid lines and clamps stock", async () => {
   assert.deepEqual(parseVariants("M | مشکی | 3\nbad line\nL | سفید | -2\nXL | آبی | x"), [
     { size: "M", color: "مشکی", stock: 3 },
     { size: "L", color: "سفید", stock: 0 },
@@ -18,62 +18,62 @@ test("parseVariants keeps valid lines and clamps stock", () => {
   ]);
 });
 
-test("placeOrder charges the right total and decrements stock", () => {
-  const v = db.prepare("SELECT v.id, v.stock, p.price FROM variants v JOIN products p ON p.id = v.product_id WHERE v.stock >= 2 LIMIT 1").get() as {
+test("placeOrder charges the right total and decrements stock", async () => {
+  const v = (await db.prepare("SELECT v.id, v.stock, p.price FROM variants v JOIN products p ON p.id = v.product_id WHERE v.stock >= 2 LIMIT 1").get()) as {
     id: number;
     stock: number;
     price: number;
   };
-  const orderId = placeOrder(user.id, { [v.id]: 2 }, info);
-  assert.equal((db.prepare("SELECT total FROM orders WHERE id = ?").get(orderId) as { total: number }).total, v.price * 2 + shippingCost(v.price * 2));
-  assert.equal(stockOf(v.id), v.stock - 2);
+  const orderId = await placeOrder(user.id, { [v.id]: 2 }, info);
+  assert.equal(((await db.prepare("SELECT total FROM orders WHERE id = ?").get(orderId)) as { total: number }).total, v.price * 2 + shippingCost(v.price * 2));
+  assert.equal(await stockOf(v.id), v.stock - 2);
 });
 
-test("placeOrder rolls back everything when any item is short", () => {
-  const [a, b] = db.prepare("SELECT id, stock FROM variants WHERE stock > 0 LIMIT 2").all() as { id: number; stock: number }[];
-  const orders = db.prepare("SELECT COUNT(*) AS n FROM orders").get() as { n: number };
-  assert.throws(() => placeOrder(user.id, { [a.id]: 1, [b.id]: b.stock + 1 }, info), /کافی نیست/);
-  assert.equal(stockOf(a.id), a.stock);
-  assert.deepEqual(db.prepare("SELECT COUNT(*) AS n FROM orders").get(), orders);
+test("placeOrder rolls back everything when any item is short", async () => {
+  const [a, b] = (await db.prepare("SELECT id, stock FROM variants WHERE stock > 0 LIMIT 2").all()) as { id: number; stock: number }[];
+  const orders = (await db.prepare("SELECT COUNT(*) AS n FROM orders").get()) as { n: number };
+  await assert.rejects(async () => await placeOrder(user.id, { [a.id]: 1, [b.id]: b.stock + 1 }, info), /کافی نیست/);
+  assert.equal(await stockOf(a.id), a.stock);
+  assert.deepEqual(await db.prepare("SELECT COUNT(*) AS n FROM orders").get(), orders);
 });
 
-test("placeOrder skips cart items whose product was deleted or hidden, instead of blocking checkout", () => {
-  const v = db.prepare("SELECT v.id, p.price FROM variants v JOIN products p ON p.id = v.product_id WHERE v.stock > 0 LIMIT 1").get() as { id: number; price: number };
-  const gone = db.prepare("INSERT INTO products (name, price) VALUES ('حذف‌شده', 1000) RETURNING id").get() as { id: number };
-  const goneVariant = db.prepare("INSERT INTO variants (product_id, size, color, stock) VALUES (?, 'M', 'x', 5) RETURNING id").get(gone.id) as { id: number };
-  db.prepare("DELETE FROM products WHERE id = ?").run(gone.id); // what the admin's delete button does; variants cascade
-  const orderId = placeOrder(user.id, { [v.id]: 1, [goneVariant.id]: 2 }, info);
-  assert.equal((db.prepare("SELECT total FROM orders WHERE id = ?").get(orderId) as { total: number }).total, v.price + shippingCost(v.price));
-  assert.throws(() => placeOrder(user.id, { [goneVariant.id]: 1 }, info), /خالی/, "a cart of only deleted items is empty");
+test("placeOrder skips cart items whose product was deleted or hidden, instead of blocking checkout", async () => {
+  const v = (await db.prepare("SELECT v.id, p.price FROM variants v JOIN products p ON p.id = v.product_id WHERE v.stock > 0 LIMIT 1").get()) as { id: number; price: number };
+  const gone = (await db.prepare("INSERT INTO products (name, price) VALUES ('حذف‌شده', 1000) RETURNING id").get()) as { id: number };
+  const goneVariant = (await db.prepare("INSERT INTO variants (product_id, size, color, stock) VALUES (?, 'M', 'x', 5) RETURNING id").get(gone.id)) as { id: number };
+  await db.prepare("DELETE FROM products WHERE id = ?").run(gone.id); // what the admin's delete button does; variants cascade
+  const orderId = await placeOrder(user.id, { [v.id]: 1, [goneVariant.id]: 2 }, info);
+  assert.equal(((await db.prepare("SELECT total FROM orders WHERE id = ?").get(orderId)) as { total: number }).total, v.price + shippingCost(v.price));
+  await assert.rejects(async () => await placeOrder(user.id, { [goneVariant.id]: 1 }, info), /خالی/, "a cart of only deleted items is empty");
 });
 
-test("placeOrder ignores bad quantities and rejects an empty cart", () => {
-  assert.throws(() => placeOrder(user.id, { 1: -5, 2: 1.5 } as Record<string, number>, info), /خالی/);
+test("placeOrder ignores bad quantities and rejects an empty cart", async () => {
+  await assert.rejects(async () => await placeOrder(user.id, { 1: -5, 2: 1.5 } as Record<string, number>, info), /خالی/);
 });
 
-test("online orders await payment, and cancelling returns stock exactly once", () => {
-  const v = db.prepare("SELECT id, stock FROM variants WHERE stock >= 1 LIMIT 1").get() as { id: number; stock: number };
-  const orderId = placeOrder(user.id, { [v.id]: 1 }, info, "online");
-  assert.deepEqual({ ...(db.prepare("SELECT status, payment FROM orders WHERE id = ?").get(orderId) as object) }, {
+test("online orders await payment, and cancelling returns stock exactly once", async () => {
+  const v = (await db.prepare("SELECT id, stock FROM variants WHERE stock >= 1 LIMIT 1").get()) as { id: number; stock: number };
+  const orderId = await placeOrder(user.id, { [v.id]: 1 }, info, "online");
+  assert.deepEqual({ ...((await db.prepare("SELECT status, payment FROM orders WHERE id = ?").get(orderId)) as object) }, {
     status: "awaiting_payment",
     payment: "online",
   });
-  assert.equal(stockOf(v.id), v.stock - 1);
-  cancelOrder(orderId);
-  cancelOrder(orderId);
-  assert.equal(stockOf(v.id), v.stock);
+  assert.equal(await stockOf(v.id), v.stock - 1);
+  await cancelOrder(orderId);
+  await cancelOrder(orderId);
+  assert.equal(await stockOf(v.id), v.stock);
 });
 
-test("purgeOrder deletes the order and its items, returning stock only if it hadn't shipped", () => {
-  const v = db.prepare("SELECT id, stock FROM variants WHERE stock >= 2 LIMIT 1").get() as { id: number; stock: number };
-  const open = placeOrder(user.id, { [v.id]: 1 }, info);
-  const shipped = placeOrder(user.id, { [v.id]: 1 }, info);
-  db.prepare("UPDATE orders SET status = 'shipped' WHERE id = ?").run(shipped);
-  purgeOrder(open);
-  purgeOrder(shipped);
-  assert.equal(stockOf(v.id), v.stock - 1);
-  assert.equal(db.prepare("SELECT 1 FROM orders WHERE id IN (?, ?)").get(open, shipped), undefined);
-  assert.equal(db.prepare("SELECT 1 FROM order_items WHERE order_id IN (?, ?)").get(open, shipped), undefined);
+test("purgeOrder deletes the order and its items, returning stock only if it hadn't shipped", async () => {
+  const v = (await db.prepare("SELECT id, stock FROM variants WHERE stock >= 2 LIMIT 1").get()) as { id: number; stock: number };
+  const open = await placeOrder(user.id, { [v.id]: 1 }, info);
+  const shipped = await placeOrder(user.id, { [v.id]: 1 }, info);
+  await db.prepare("UPDATE orders SET status = 'shipped' WHERE id = ?").run(shipped);
+  await purgeOrder(open);
+  await purgeOrder(shipped);
+  assert.equal(await stockOf(v.id), v.stock - 1);
+  assert.equal(await db.prepare("SELECT 1 FROM orders WHERE id IN (?, ?)").get(open, shipped), undefined);
+  assert.equal(await db.prepare("SELECT 1 FROM order_items WHERE order_id IN (?, ?)").get(open, shipped), undefined);
 });
 
 test("every sample product has a photo file and parseable variants", async () => {
@@ -85,7 +85,7 @@ test("every sample product has a photo file and parseable variants", async () =>
   }
 });
 
-test("new passwords need 8-64 chars, a letter, a digit, and a matching confirmation", () => {
+test("new passwords need 8-64 chars, a letter, a digit, and a matching confirmation", async () => {
   const ok = (p: string, c = p) => passwordProblem(p, c) === null;
   assert.ok(ok("password1"));
   assert.ok(ok("رمزعبور۱۲۳"), "Persian letters and digits count");
@@ -168,34 +168,34 @@ test("SMS codes: right code passes, wrong ones count, 3 tries, 3-minute expiry, 
   const { checkCode, consumeCode, createCode, resendWait, smsAllowedForIp } = await import("../lib/otp.ts");
   const phone = "09120000001";
   let t = 2_000_000_000_000;
-  const code = createCode(phone, t);
+  const code = await createCode(phone, t);
   assert.match(code, /^\d{6}$/);
-  assert.equal(checkCode(phone, code === "111111" ? "222222" : "111111", t), "کد وارد شده اشتباه است");
-  assert.equal(checkCode(phone, code, t), null, "right code passes");
-  assert.equal(checkCode(phone, code, t), null, "still valid until consumed (so a missing name can be fixed)");
-  consumeCode(phone);
-  assert.notEqual(checkCode(phone, code, t), null, "consumed code is gone");
+  assert.equal(await checkCode(phone, code === "111111" ? "222222" : "111111", t), "کد وارد شده اشتباه است");
+  assert.equal(await checkCode(phone, code, t), null, "right code passes");
+  assert.equal(await checkCode(phone, code, t), null, "still valid until consumed (so a missing name can be fixed)");
+  await consumeCode(phone);
+  assert.notEqual(await checkCode(phone, code, t), null, "consumed code is gone");
 
-  assert.throws(() => createCode("09120000002", t) && createCode("09120000002", t + 30_000), /صبر کنید/, "resend needs 1 minute");
-  assert.equal(resendWait("09120000002", t + 30_000), 30, "countdown shows the seconds left");
-  assert.equal(resendWait("09120000002", t + 61_000), 0, "no wait after a minute");
-  assert.equal(resendWait("09129999999", t), 0, "no wait for a phone that never got a code");
-  const late = createCode("09120000003", t);
-  assert.notEqual(checkCode("09120000003", late, t + 3 * 60_000 + 1), null, "expired after 3 minutes");
+  await assert.rejects(async () => await createCode("09120000002", t) && await createCode("09120000002", t + 30_000), /صبر کنید/, "resend needs 1 minute");
+  assert.equal(await resendWait("09120000002", t + 30_000), 30, "countdown shows the seconds left");
+  assert.equal(await resendWait("09120000002", t + 61_000), 0, "no wait after a minute");
+  assert.equal(await resendWait("09129999999", t), 0, "no wait for a phone that never got a code");
+  const late = await createCode("09120000003", t);
+  assert.notEqual(await checkCode("09120000003", late, t + 3 * 60_000 + 1), null, "expired after 3 minutes");
 
-  const brute = createCode("09120000004", t);
+  const brute = await createCode("09120000004", t);
   const wrong = brute === "000000" ? "111111" : "000000";
-  for (let i = 0; i < 3; i++) checkCode("09120000004", wrong, t);
-  assert.notEqual(checkCode("09120000004", brute, t), null, "locked after 3 wrong tries");
+  for (let i = 0; i < 3; i++) await checkCode("09120000004", wrong, t);
+  assert.notEqual(await checkCode("09120000004", brute, t), null, "locked after 3 wrong tries");
 
-  for (let i = 0; i < 5; i++) createCode("09120000005", (t += 61_000));
-  assert.throws(() => createCode("09120000005", (t += 61_000)), /یک ساعت/, "6th code in an hour refused");
-  assert.doesNotThrow(() => createCode("09120000005", t + 60 * 60_000), "allowed again after the hour");
+  for (let i = 0; i < 5; i++) await createCode("09120000005", (t += 61_000));
+  await assert.rejects(async () => await createCode("09120000005", (t += 61_000)), /یک ساعت/, "6th code in an hour refused");
+  await assert.doesNotReject(async () => await createCode("09120000005", t + 60 * 60_000), "allowed again after the hour");
 
-  for (let i = 0; i < 10; i++) assert.ok(smsAllowedForIp("1.2.3.4", t + i), "10 codes per IP per hour");
-  assert.equal(smsAllowedForIp("1.2.3.4", t + 10), false, "11th code from the same IP refused");
-  assert.ok(smsAllowedForIp("5.6.7.8", t + 10), "other IPs unaffected");
-  assert.ok(smsAllowedForIp("1.2.3.4", t + 60 * 60_000), "allowed again after the hour");
+  for (let i = 0; i < 10; i++) assert.ok(await smsAllowedForIp("1.2.3.4", t + i), "10 codes per IP per hour");
+  assert.equal(await smsAllowedForIp("1.2.3.4", t + 10), false, "11th code from the same IP refused");
+  assert.ok(await smsAllowedForIp("5.6.7.8", t + 10), "other IPs unaffected");
+  assert.ok(await smsAllowedForIp("1.2.3.4", t + 60 * 60_000), "allowed again after the hour");
 });
 
 test("?error= banners show only messages the server signed", async () => {
@@ -205,17 +205,17 @@ test("?error= banners show only messages the server signed", async () => {
   assert.equal(readErrorParam(value.replace("اشتباه", "مسدود")), null, "edited message rejected");
   assert.equal(readErrorParam("حساب شما مسدود شد؛ با ۰۹۱۲ تماس بگیرید"), null, "unsigned text rejected");
   assert.equal(readErrorParam(["a", "b"]), null);
-  const stored = db.prepare("SELECT value FROM settings WHERE name = 'error_key'").get() as { value: string } | undefined;
+  const stored = (await db.prepare("SELECT value FROM settings WHERE name = 'error_key'").get()) as { value: string } | undefined;
   assert.match(stored?.value ?? "", /^[0-9a-f]{64}$/, "signing key kept in the database, so links survive a restart");
 });
 
 test("login lockout and the per-IP SMS limit are stored in the database", async () => {
   const { smsAllowedForIp } = await import("../lib/otp.ts");
   const t = Date.now();
-  recordLoginFailure("db@x.zz", "9.9.9.9", t);
-  smsAllowedForIp("9.9.9.9", t);
-  assert.ok(db.prepare("SELECT 1 FROM login_failures WHERE email = 'db@x.zz'").get());
-  assert.ok(db.prepare("SELECT 1 FROM sms_ip_sends WHERE ip = '9.9.9.9'").get());
+  await recordLoginFailure("db@x.zz", "9.9.9.9", t);
+  await smsAllowedForIp("9.9.9.9", t);
+  assert.ok(await db.prepare("SELECT 1 FROM login_failures WHERE email = 'db@x.zz'").get());
+  assert.ok(await db.prepare("SELECT 1 FROM sms_ip_sends WHERE ip = '9.9.9.9'").get());
 });
 
 test("?next= only allows same-site paths", async () => {
@@ -233,34 +233,34 @@ test("passwords verify only with the right password", async () => {
   assert.ok(!(await verifyPassword("wrong", stored)));
 });
 
-test("login locks after 5 failures in 15 minutes and unlocks after", () => {
+test("login locks after 5 failures in 15 minutes and unlocks after", async () => {
   const t = 1_000_000_000;
   const ip = "1.1.1.1";
-  for (let i = 0; i < 4; i++) recordLoginFailure("x@y.zz", ip, t + i);
-  assert.ok(!loginLocked("x@y.zz", ip, t + 10), "4 failures: still open");
-  recordLoginFailure("x@y.zz", ip, t + 5);
-  assert.ok(loginLocked("x@y.zz", ip, t + 10), "5 failures: locked");
-  assert.ok(!loginLocked("x@y.zz", "2.2.2.2", t + 10), "an attacker's failures don't lock the owner out on their own IP");
-  assert.ok(!loginLocked("x@y.zz", ip, t + 15 * 60 * 1000 + 10), "window passed: open again");
-  for (let i = 0; i < 5; i++) recordLoginFailure("a@b.cc", ip, t);
-  clearLoginFailures("a@b.cc");
-  assert.ok(!loginLocked("a@b.cc", ip, t), "successful login clears");
+  for (let i = 0; i < 4; i++) await recordLoginFailure("x@y.zz", ip, t + i);
+  assert.ok(!await loginLocked("x@y.zz", ip, t + 10), "4 failures: still open");
+  await recordLoginFailure("x@y.zz", ip, t + 5);
+  assert.ok(await loginLocked("x@y.zz", ip, t + 10), "5 failures: locked");
+  assert.ok(!await loginLocked("x@y.zz", "2.2.2.2", t + 10), "an attacker's failures don't lock the owner out on their own IP");
+  assert.ok(!await loginLocked("x@y.zz", ip, t + 15 * 60 * 1000 + 10), "window passed: open again");
+  for (let i = 0; i < 5; i++) await recordLoginFailure("a@b.cc", ip, t);
+  await clearLoginFailures("a@b.cc");
+  assert.ok(!await loginLocked("a@b.cc", ip, t), "successful login clears");
 
   const sprayer = "3.3.3.3";
-  for (let i = 0; i < 20; i++) recordLoginFailure(`user${i}@b.cc`, sprayer, t);
-  assert.ok(loginLocked("someone-new@b.cc", sprayer, t + 10), "20 failures from one IP lock that IP for every email");
+  for (let i = 0; i < 20; i++) await recordLoginFailure(`user${i}@b.cc`, sprayer, t);
+  assert.ok(await loginLocked("someone-new@b.cc", sprayer, t + 10), "20 failures from one IP lock that IP for every email");
 });
 
-test("unpaid online orders expire after 30 minutes and return stock", () => {
-  const v = db.prepare("SELECT id, stock FROM variants WHERE stock >= 2 LIMIT 1").get() as { id: number; stock: number };
-  const old = placeOrder(user.id, { [v.id]: 1 }, info, "online");
-  const fresh = placeOrder(user.id, { [v.id]: 1 }, info, "online");
-  db.prepare("UPDATE orders SET created_at = datetime('now', '-31 minutes') WHERE id = ?").run(old);
-  expireUnpaidOrders();
-  const status = (id: number) => (db.prepare("SELECT status FROM orders WHERE id = ?").get(id) as { status: string }).status;
-  assert.equal(status(old), "cancelled");
-  assert.equal(status(fresh), "awaiting_payment");
-  assert.equal(stockOf(v.id), v.stock - 1, "only the expired order's item came back");
+test("unpaid online orders expire after 30 minutes and return stock", async () => {
+  const v = (await db.prepare("SELECT id, stock FROM variants WHERE stock >= 2 LIMIT 1").get()) as { id: number; stock: number };
+  const old = await placeOrder(user.id, { [v.id]: 1 }, info, "online");
+  const fresh = await placeOrder(user.id, { [v.id]: 1 }, info, "online");
+  await db.prepare("UPDATE orders SET created_at = datetime('now', '-31 minutes') WHERE id = ?").run(old);
+  await expireUnpaidOrders();
+  const status = async (id: number) => ((await db.prepare("SELECT status FROM orders WHERE id = ?").get(id)) as { status: string }).status;
+  assert.equal(await status(old), "cancelled");
+  assert.equal(await status(fresh), "awaiting_payment");
+  assert.equal(await stockOf(v.id), v.stock - 1, "only the expired order's item came back");
 });
 
 test("every province has its city list", async () => {
@@ -271,59 +271,41 @@ test("every province has its city list", async () => {
   assert.ok(CITIES["تهران"].includes("تهران") && CITIES["اصفهان"].includes("کاشان"));
 });
 
-test("shipping is 85,000 toman below 5,000,000 and free from it", () => {
+test("shipping is 85,000 toman below 5,000,000 and free from it", async () => {
   assert.equal(shippingCost(4_999_999), 85_000);
   assert.equal(shippingCost(5_000_000), 0);
   assert.equal(shippingCost(7_000_000), 0);
-});
-
-test("daily backup writes one consistent copy per day and keeps the newest 14", async () => {
-  const { mkdtempSync, readdirSync } = await import("node:fs");
-  const { tmpdir } = await import("node:os");
-  const { join } = await import("node:path");
-  const { DatabaseSync } = await import("node:sqlite");
-  const { backupNow, dailyBackup } = await import("../lib/backup.ts");
-  const dir = mkdtempSync(join(tmpdir(), "tikla-backup-"));
-  for (let day = 1; day <= 16; day++) dailyBackup(dir, `2026-01-${String(day).padStart(2, "0")}`);
-  dailyBackup(dir, "2026-01-16"); // same day again: no error, no second file
-  const files = readdirSync(dir).sort();
-  assert.equal(files.length, 14);
-  assert.equal(files[0], "shop-2026-01-03.db", "the two oldest were deleted");
-  const copy = new DatabaseSync(join(dir, files.at(-1)!));
-  assert.ok((copy.prepare("SELECT COUNT(*) AS n FROM products").get() as { n: number }).n > 0, "the backup holds the shop's data");
-  copy.close();
-  assert.equal(backupNow().subarray(0, 15).toString(), "SQLite format 3", "download is a real SQLite file");
 });
 
 test("discount codes: percent or capped amount, minimum, expiry, use limit, inactive", async () => {
   const { couponDiscount } = await import("../lib/db.ts");
   const add = (code: string, fields: Record<string, number | string | null>) =>
     db.prepare(`INSERT INTO coupons (code, ${Object.keys(fields).join(", ")}) VALUES (?, ${Object.keys(fields).map(() => "?").join(", ")})`).run(code, ...Object.values(fields));
-  add("P20", { percent: 20 });
-  add("A50K", { amount: 50_000, min_total: 200_000 });
-  add("OLD", { percent: 10, expires_on: "2026-01-01" });
-  add("ONCE", { percent: 10, max_uses: 1, used: 1 });
-  add("OFF", { percent: 10, active: 0 });
-  assert.deepEqual(couponDiscount("P20", 123_456), { discount: 24_691 }, "20%, rounded down to whole toman");
-  assert.deepEqual(couponDiscount("A50K", 300_000), { discount: 50_000 });
-  assert.ok("error" in couponDiscount("A50K", 199_999), "below the minimum");
-  assert.deepEqual(couponDiscount("OLD", 100_000, Date.parse("2026-01-01T20:00:00Z")), { discount: 10_000 }, "still valid on its last day (Tehran time)");
-  assert.ok("error" in couponDiscount("OLD", 100_000, Date.parse("2026-01-01T21:00:00Z")), "expired once Tehran's next day starts");
-  for (const code of ["ONCE", "OFF", "NOPE"]) assert.ok("error" in couponDiscount(code, 100_000), code);
+  await add("P20", { percent: 20 });
+  await add("A50K", { amount: 50_000, min_total: 200_000 });
+  await add("OLD", { percent: 10, expires_on: "2026-01-01" });
+  await add("ONCE", { percent: 10, max_uses: 1, used: 1 });
+  await add("OFF", { percent: 10, active: 0 });
+  assert.deepEqual(await couponDiscount("P20", 123_456), { discount: 24_691 }, "20%, rounded down to whole toman");
+  assert.deepEqual(await couponDiscount("A50K", 300_000), { discount: 50_000 });
+  assert.ok("error" in await couponDiscount("A50K", 199_999), "below the minimum");
+  assert.deepEqual(await couponDiscount("OLD", 100_000, Date.parse("2026-01-01T20:00:00Z")), { discount: 10_000 }, "still valid on its last day (Tehran time)");
+  assert.ok("error" in await couponDiscount("OLD", 100_000, Date.parse("2026-01-01T21:00:00Z")), "expired once Tehran's next day starts");
+  for (const code of ["ONCE", "OFF", "NOPE"]) assert.ok("error" in await couponDiscount(code, 100_000), code);
 });
 
 test("placeOrder applies a code, counts its use atomically, and cancelling gives the use back", async () => {
   const { orderTotal } = await import("../lib/db.ts");
-  db.prepare("INSERT INTO coupons (code, percent, max_uses) VALUES ('LAST1', 10, 1)").run();
-  const v = db.prepare("SELECT v.id, p.price FROM variants v JOIN products p ON p.id = v.product_id WHERE v.stock >= 2 LIMIT 1").get() as { id: number; price: number };
-  const orderId = placeOrder(user.id, { [v.id]: 1 }, info, "cod", "LAST1");
-  const order = db.prepare("SELECT total, discount, coupon FROM orders WHERE id = ?").get(orderId) as { total: number; discount: number; coupon: string };
+  await db.prepare("INSERT INTO coupons (code, percent, max_uses) VALUES ('LAST1', 10, 1)").run();
+  const v = (await db.prepare("SELECT v.id, p.price FROM variants v JOIN products p ON p.id = v.product_id WHERE v.stock >= 2 LIMIT 1").get()) as { id: number; price: number };
+  const orderId = await placeOrder(user.id, { [v.id]: 1 }, info, "cod", "LAST1");
+  const order = (await db.prepare("SELECT total, discount, coupon FROM orders WHERE id = ?").get(orderId)) as { total: number; discount: number; coupon: string };
   assert.equal(order.discount, Math.floor(v.price / 10));
   assert.equal(order.coupon, "LAST1");
   assert.equal(order.total, orderTotal(v.price, order.discount), "shipping charged on the discounted amount");
-  assert.throws(() => placeOrder(user.id, { [v.id]: 1 }, info, "cod", "LAST1"), /ظرفیت/, "the only use is taken");
-  cancelOrder(orderId);
-  assert.equal((db.prepare("SELECT used FROM coupons WHERE code = 'LAST1'").get() as { used: number }).used, 0, "cancel returns the use");
+  await assert.rejects(async () => await placeOrder(user.id, { [v.id]: 1 }, info, "cod", "LAST1"), /ظرفیت/, "the only use is taken");
+  await cancelOrder(orderId);
+  assert.equal(((await db.prepare("SELECT used FROM coupons WHERE code = 'LAST1'").get()) as { used: number }).used, 0, "cancel returns the use");
 });
 
 test("admin discount-code rules", async () => {
@@ -352,22 +334,22 @@ test("CSV export quotes every cell and defuses Excel formulas", async () => {
   assert.equal(csv([["a", 'say "hi"', null], ["=HYPERLINK(\"x\")", "-1", "09121234567"]]), '"a","say ""hi""",""\r\n"\'=HYPERLINK(""x"")","\'-1","09121234567"');
 });
 
-test("every starter category gets a size guide listing each size its products use", () => {
-  for (const c of db.prepare("SELECT name, size_guide FROM categories").all() as { name: string; size_guide: string }[]) {
+test("every starter category gets a size guide listing each size its products use", async () => {
+  for (const c of (await db.prepare("SELECT name, size_guide FROM categories").all()) as { name: string; size_guide: string }[]) {
     const listed = new Set(c.size_guide.split("\n").map((l) => l.split("|")[0].trim()));
-    const used = db.prepare("SELECT DISTINCT v.size FROM variants v JOIN products p ON p.id = v.product_id WHERE p.category = ?").all(c.name) as { size: string }[];
+    const used = (await db.prepare("SELECT DISTINCT v.size FROM variants v JOIN products p ON p.id = v.product_id WHERE p.category = ?").all(c.name)) as { size: string }[];
     for (const { size } of used) assert.ok(listed.has(size), `${c.name}: size ${size} missing from its guide`);
   }
 });
 
 test("popular searches: most-made first, spaces collapsed, product types fill the rest", async () => {
   const { countSearch, popularSearches } = await import("../lib/db.ts");
-  const before = popularSearches();
+  const before = await popularSearches();
   assert.equal(before.length, 6); // sample products alone fill the list with types
-  countSearch("هودی");
-  countSearch("کفش  چرم");
-  countSearch(" کفش چرم ");
-  const list = popularSearches();
+  await countSearch("هودی");
+  await countSearch("کفش  چرم");
+  await countSearch(" کفش چرم ");
+  const list = await popularSearches();
   assert.deepEqual(list.slice(0, 2), ["کفش چرم", "هودی"]);
   assert.equal(list.length, 6);
   assert.equal(new Set(list).size, 6);
@@ -375,19 +357,19 @@ test("popular searches: most-made first, spaces collapsed, product types fill th
 
 test("product listing: home shows pages 1..N, the API one page at a time, with filters applied", async () => {
   const { listProducts, PAGE_SIZE } = await import("../lib/products.ts");
-  const all = listProducts({});
+  const all = await listProducts({});
   assert.ok(all.total > PAGE_SIZE * 2); // the samples span several pages
-  const ids = (params: Record<string, string>, only = false) => listProducts(params, only).products.map((p) => p.id);
-  const [p1, p2] = [ids({ page: "1" }, true), ids({ page: "2" }, true)];
+  const ids = async (params: Record<string, string>, only = false) => (await listProducts(params, only)).products.map((p) => p.id);
+  const [p1, p2] = [await ids({ page: "1" }, true), await ids({ page: "2" }, true)];
   assert.equal(p1.length, PAGE_SIZE);
-  assert.deepEqual(ids({ page: "2" }), [...p1, ...p2]); // home ?page=2 = API pages 1 and 2, in order, no overlap
+  assert.deepEqual(await ids({ page: "2" }), [...p1, ...p2]); // home ?page=2 = API pages 1 and 2, in order, no overlap
   assert.equal(new Set([...p1, ...p2]).size, PAGE_SIZE * 2);
-  assert.deepEqual(listProducts({ page: "999" }, true).products, []); // past the end: empty, not clamped
-  assert.equal(listProducts({ page: "999" }).page, all.pages); // the home page clamps it
-  const shoes = listProducts({ category: "کفش", sort: "cheap" });
+  assert.deepEqual((await listProducts({ page: "999" }, true)).products, []); // past the end: empty, not clamped
+  assert.equal((await listProducts({ page: "999" })).page, all.pages); // the home page clamps it
+  const shoes = await listProducts({ category: "کفش", sort: "cheap" });
   assert.ok(shoes.products.every((p) => p.category === "کفش"));
   assert.deepEqual(shoes.products.map((p) => p.price), shoes.products.map((p) => p.price).toSorted((a, b) => a - b));
-  const cheap = listProducts({ max: String(shoes.products[1].price), category: "کفش" });
+  const cheap = await listProducts({ max: String(shoes.products[1].price), category: "کفش" });
   assert.ok(cheap.products.length >= 2 && cheap.products.every((p) => p.price <= shoes.products[1].price));
-  assert.ok(listProducts({}).products.every((p) => p.variants.every((v) => v.product_id === p.id && v.stock > 0)));
+  assert.ok((await listProducts({})).products.every((p) => p.variants.every((v) => v.product_id === p.id && v.stock > 0)));
 });

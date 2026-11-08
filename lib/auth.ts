@@ -17,8 +17,8 @@ const sha = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export async function startSession(userId: number) {
   const token = randomBytes(32).toString("hex");
-  db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(Date.now());
-  db.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").run(
+  await db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(Date.now());
+  await db.prepare("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)").run(
     sha(token),
     userId,
     Date.now() + MAX_AGE * 1000,
@@ -35,27 +35,27 @@ export async function startSession(userId: number) {
 export async function endSession() {
   const store = await cookies();
   const token = store.get(COOKIE)?.value;
-  if (token) db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(sha(token));
+  if (token) await db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(sha(token));
   store.delete(COOKIE);
 }
 
 /** Signs out every other device of this user, e.g. after a password change, so a stolen session stops working. */
 export async function endOtherSessions(userId: number) {
   const token = (await cookies()).get(COOKIE)?.value ?? "";
-  db.prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?").run(userId, sha(token));
+  await db.prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?").run(userId, sha(token));
 }
 
 // cache(): the layout, the login modal and the page all ask during one render; one query answers them.
 export const getUser = cache(async () => {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return undefined;
-  return db
+  return (await db
     .prepare(
       `SELECT u.id, u.name, u.email, u.phone, u.password_hash IS NOT NULL AS has_password, u.phone IS ? AS is_admin
        FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > ?`,
     )
-    .get(ADMIN_PHONE, sha(token), Date.now()) as User | undefined;
+    .get(ADMIN_PHONE, sha(token), Date.now())) as User | undefined;
 });
 
 export async function requireUser(next: string) {

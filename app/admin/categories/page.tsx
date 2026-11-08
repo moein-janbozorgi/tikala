@@ -11,11 +11,11 @@ const CATEGORY_RULE = "نام دسته‌بندی باید ۲ تا ۴۰ کارا
 export default async function AdminCategoriesPage({ searchParams }: PageProps<"/admin/categories">) {
   await requireAdmin();
   const { error, saved } = await searchParams;
-  const categories = db
+  const categories = (await db
     .prepare("SELECT c.name, c.size_guide, COUNT(p.id) AS n FROM categories c LEFT JOIN products p ON p.category = c.name GROUP BY c.name ORDER BY c.name")
-    .all() as { name: string; size_guide: string; n: number }[];
+    .all()) as { name: string; size_guide: string; n: number }[];
   const types = Map.groupBy(
-    db.prepare("SELECT DISTINCT category, subcategory FROM products WHERE subcategory != '' ORDER BY subcategory").all() as { category: string; subcategory: string }[],
+    (await db.prepare("SELECT DISTINCT category, subcategory FROM products WHERE subcategory != '' ORDER BY subcategory").all()) as { category: string; subcategory: string }[],
     (t) => t.category,
   );
 

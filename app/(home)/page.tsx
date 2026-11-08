@@ -36,7 +36,7 @@ export async function generateMetadata({ searchParams }: PageProps<"/">): Promis
   const category = typeof params.category === "string" ? params.category : undefined;
   const type = category && typeof params.type === "string" ? params.type : undefined;
   const canonical = category ? `/?${new URLSearchParams(type ? { category, type } : { category })}` : "/";
-  const exists = !category || db.prepare("SELECT 1 FROM products WHERE active = 1 AND category = ? AND (? IS NULL OR subcategory = ?)").get(category, type ?? null, type ?? null);
+  const exists = !category || await db.prepare("SELECT 1 FROM products WHERE active = 1 AND category = ? AND (? IS NULL OR subcategory = ?)").get(category, type ?? null, type ?? null);
   const robots = typeof params.q === "string" || !exists ? { index: false, follow: true } : undefined;
   if (!category) return { alternates: { canonical }, robots };
   const name = type ? `${type} (${category})` : category;
@@ -46,13 +46,13 @@ export async function generateMetadata({ searchParams }: PageProps<"/">): Promis
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
-  const { products, total, page, pages, category, type, q, sort, sale, min, max, lo, hi } = listProducts(params);
-  const categories = db
+  const { products, total, page, pages, category, type, q, sort, sale, min, max, lo, hi } = await listProducts(params);
+  const categories = (await db
     .prepare("SELECT DISTINCT category FROM products WHERE active = 1 AND category != '' ORDER BY category")
-    .all() as { category: string }[];
+    .all()) as { category: string }[];
   // Feeds «جستجوهای پرطرفدار». Only searches that found something, so that list only ever shows text from the shop.
   // shortcut: a reload counts again, so one visitor can lift a term; count once per session or IP if that gets abused.
-  if (q && total && !params.page) countSearch(q);
+  if (q && total && !params.page) await countSearch(q);
   /** Link to this listing with some parameters changed, keeping the rest. */
   const link = (change: Record<string, string | number | undefined>) => {
     const next = new URLSearchParams();

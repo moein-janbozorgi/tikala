@@ -6,9 +6,9 @@ import { SITE_URL } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 /** The home page, each category with products, and every product on sale. */
-export default function sitemap(): MetadataRoute.Sitemap {
-  const categories = db.prepare("SELECT DISTINCT category FROM products WHERE active = 1 AND category != ''").all() as { category: string }[];
-  const products = db.prepare("SELECT id FROM products WHERE active = 1 ORDER BY id").all() as { id: number }[];
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const categories = (await db.prepare("SELECT DISTINCT category FROM products WHERE active = 1 AND category != ''").all()) as { category: string }[];
+  const products = (await db.prepare("SELECT id FROM products WHERE active = 1 ORDER BY id").all()) as { id: number }[];
   return [
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/about`, changeFrequency: "monthly", priority: 0.3 },

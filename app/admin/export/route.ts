@@ -6,12 +6,12 @@ import { csv } from "@/lib/csv";
 /** All orders as a CSV file that opens in Excel (UTF-8 with BOM, so Persian text shows correctly). Admin only. */
 export async function GET() {
   await requireAdmin();
-  const orders = db
+  const orders = (await db
     .prepare(
       `SELECT o.*, (SELECT group_concat(product_name || ' (' || size || ' / ' || color || ') × ' || qty, ' + ') FROM order_items WHERE order_id = o.id) AS items
        FROM orders o ORDER BY o.id DESC`,
     )
-    .all() as Record<string, string | number | null>[];
+    .all()) as Record<string, string | number | null>[];
   const columns: [string, (o: Record<string, string | number | null>) => unknown][] = [
     ["شماره سفارش", (o) => o.id],
     ["تاریخ (UTC)", (o) => o.created_at],

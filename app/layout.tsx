@@ -45,9 +45,9 @@ export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
   const theme = saved === "light" || saved === "dark" ? saved : "system";
   // Category -> its types, for the side menu.
   const categories: { category: string; types: string[] }[] = [];
-  const rows = db
+  const rows = (await db
     .prepare("SELECT DISTINCT category, subcategory FROM products WHERE active = 1 AND category != '' ORDER BY category, subcategory")
-    .all() as { category: string; subcategory: string }[];
+    .all()) as { category: string; subcategory: string }[];
   for (const r of rows) {
     if (categories.at(-1)?.category !== r.category) categories.push({ category: r.category, types: [] });
     if (r.subcategory) categories.at(-1)!.types.push(r.subcategory);
@@ -127,7 +127,7 @@ export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
         </header>
         <SideMenu categories={categories} />
         <Suspense>
-          <SearchBox categories={categories} popular={popularSearches()} />
+          <SearchBox categories={categories} popular={await popularSearches()} />
         </Suspense>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:py-8">{children}</main>
         <Footer categories={categories} />

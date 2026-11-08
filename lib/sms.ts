@@ -51,7 +51,7 @@ export async function sendLoginCode(phone: string, code: string) {
 
 /** Order update by SMS. Best effort: a failed message is logged and never breaks the order. */
 export async function notifyOrder(orderId: number, event: "placed" | "paid" | "shipped") {
-  const order = db.prepare("SELECT id, phone, total, ref_id, tracking_code FROM orders WHERE id = ?").get(orderId) as
+  const order = (await db.prepare("SELECT id, phone, total, ref_id, tracking_code FROM orders WHERE id = ?").get(orderId)) as
     | { id: number; phone: string; total: number; ref_id: string | null; tracking_code: string }
     | undefined;
   if (!order) return;

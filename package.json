@@ -11,6 +11,8 @@
     "test:e2e": "node --no-warnings tests/e2e.mjs"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "@vercel/blob": "^2.8.2",
     "next": "16.4.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",

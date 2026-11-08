@@ -10,8 +10,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/about" },
 };
 
-export default function AboutPage() {
-  const categories = (db.prepare("SELECT DISTINCT category FROM products WHERE active = 1 AND category != '' ORDER BY category").all() as { category: string }[]).map(
+export default async function AboutPage() {
+  const categories = ((await db.prepare("SELECT DISTINCT category FROM products WHERE active = 1 AND category != '' ORDER BY category").all()) as { category: string }[]).map(
     (c) => c.category,
   );
 

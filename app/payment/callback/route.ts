@@ -9,7 +9,7 @@ import { toRial, verifyPayment } from "@/lib/zarinpal";
 // the order is found by authority and the amount comes from the database.
 export async function GET(req: NextRequest) {
   const authority = req.nextUrl.searchParams.get("Authority") ?? "";
-  const order = db.prepare("SELECT id, total, status FROM orders WHERE authority = ?").get(authority) as
+  const order = (await db.prepare("SELECT id, total, status FROM orders WHERE authority = ?").get(authority)) as
     | { id: number; total: number; status: string }
     | undefined;
   if (!authority || !order) redirect(`/account?error=${errorParam("تراکنش پیدا نشد")}`);
@@ -24,11 +24,11 @@ export async function GET(req: NextRequest) {
     } else {
       try {
         const refId = await verifyPayment(authority, toRial(order!.total));
-        const paid = db.prepare("UPDATE orders SET status = 'pending', ref_id = ? WHERE id = ? AND status = 'awaiting_payment'").run(refId, order!.id);
+        const paid = await db.prepare("UPDATE orders SET status = 'pending', ref_id = ? WHERE id = ? AND status = 'awaiting_payment'").run(refId, order!.id);
         if (paid.changes) after(() => notifyOrder(order!.id, "paid"));
         else {
           // Expired (cancelled) while Zarinpal was verifying: the money is taken, so keep the bank reference for the refund.
-          db.prepare("UPDATE orders SET ref_id = ? WHERE id = ?").run(refId, order!.id);
+          await db.prepare("UPDATE orders SET ref_id = ? WHERE id = ?").run(refId, order!.id);
           console.error(`Order ${order!.id} was paid (ref ${refId}) after it was cancelled; refund it`);
           error = "پرداخت انجام شد ولی مهلت سفارش تمام شده بود؛ مبلغ توسط فروشگاه بازگردانده می‌شود";
         }

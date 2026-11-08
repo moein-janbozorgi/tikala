@@ -15,7 +15,7 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
   const q = typeof params.q === "string" ? params.q.trim().slice(0, 50) : "";
   const category = typeof params.category === "string" ? params.category : "";
   const lowOnly = params.stock === "low";
-  const categories = (db.prepare("SELECT name FROM categories ORDER BY name").all() as { name: string }[]).map((c) => c.name);
+  const categories = ((await db.prepare("SELECT name FROM categories ORDER BY name").all()) as { name: string }[]).map((c) => c.name);
 
   const where = ["1"];
   const args: string[] = [];
@@ -27,14 +27,14 @@ export default async function AdminProductsPage({ searchParams }: PageProps<"/ad
     where.push("p.name LIKE ? ESCAPE '\\'");
     args.push(likeContains(q));
   }
-  const products = db
+  const products = (await db
     .prepare(
       // low = how many of its size/colours are almost sold out (1 to LOW_STOCK left).
       `SELECT p.*, COALESCE(SUM(v.stock), 0) AS stock, COALESCE(SUM(v.stock BETWEEN 1 AND ${LOW_STOCK}), 0) AS low
        FROM products p LEFT JOIN variants v ON v.product_id = p.id
        WHERE ${where.join(" AND ")} GROUP BY p.id ${lowOnly ? "HAVING low > 0" : ""} ORDER BY p.id DESC`,
     )
-    .all(...args) as (Product & { stock: number; low: number })[];
+    .all(...args)) as (Product & { stock: number; low: number })[];
 
   return (
     <div className="space-y-5">
