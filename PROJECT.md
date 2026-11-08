@@ -7,8 +7,8 @@ Read this before changing code. Human setup and operations are in [README.md](RE
 Tikla (بوتیک تیکلا), a Persian, right-to-left clothing shop. One Next.js app with no external database or ORM:
 
 - Next.js 16.4.4 (App Router, server actions), React 19.3, Tailwind 4 (via `@tailwindcss/turbopack`), TypeScript
-- `node:sqlite` (`DatabaseSync`, synchronous), which needs Node 22.13 or newer
-- `sharp` to convert uploaded photos to WebP
+- SQLite through `@libsql/client` (async): a local file (`DB_PATH`) in development, tests and Docker; **Turso** when `TURSO_DATABASE_URL` is set (Vercel)
+- `sharp` to convert uploaded photos to WebP; `@vercel/blob` stores them when `BLOB_READ_WRITE_TOKEN` is set (Vercel), else `data/uploads`
 - Outside services: Zarinpal (payments) and Kavenegar (SMS), both called with `fetch` and no SDK
 
 ## Commands
@@ -36,7 +36,7 @@ app/
   @auth/                parallel-route login/register/SMS-code modal (opened by ?auth=login)
   [...path]/            catch-all 404
   admin/                admin panel (orders = page.tsx, products, categories, coupons, reports,
-                        orders/[id]/invoice, backup + export routes); actions.ts = admin server actions
+                        orders/[id]/invoice, export route); actions.ts = admin server actions
   api/products          JSON product list (for "load more")
   api/suggest           search-box suggestions
   payment/callback      Zarinpal return URL: verifies the payment
@@ -46,8 +46,9 @@ app/
                         validated-form, submit-button, qty-stepper, price-range, offline-screen…
 lib/                    server-side logic (below)
 tests/                  shop.test.ts (node:test), e2e.mjs
-instrumentation.ts      on server start: daily DB backup timer; onRequestError → data/errors.log
-next.config.ts          standalone output when STANDALONE=1, 30 MB server-action body, security headers, cache headers
+instrumentation.ts      onRequestError → lib/error-log.ts
+next.config.ts          standalone output when STANDALONE=1, 5 MB server-action body, security headers, cache headers
+scripts/move-uploads.mjs one-off: copies data/uploads photos to Vercel Blob and rewrites their paths in Turso
 Dockerfile              two-stage standalone image, data volume at /app/data
 public/                 fonts, sample product photos (/products)
 ```
@@ -61,7 +62,7 @@ public/                 fonts, sample product photos (/products)
 
 | File | Purpose |
 |---|---|
-| `db.ts` | Opens SQLite, defines the schema and migrations, seeds samples. `transaction`, `placeOrder`, `cancelOrder`, `purgeOrder`, `expireUnpaidOrders`, `couponDiscount`, `orderTotal`, `parseVariants`/`variantsProblem`/`saveVariants`, `countSearch`/`popularSearches`, SQL fragments `TEHRAN`, `SOLD` |
+| `db.ts` | Opens libSQL (Turso or a file), defines the schema and migrations, seeds samples. `db.prepare(sql).get/all/run` (async), `transaction`, `placeOrder`, `cancelOrder`, `purgeOrder`, `expireUnpaidOrders`, `couponDiscount`, `orderTotal`, `parseVariants`/`variantsProblem`/`saveVariants`, `countSearch`/`popularSearches`, SQL fragments `TEHRAN`, `SOLD` |
 | `auth.ts` | Sessions (random token in a cookie, only its sha256 stored), `getUser` (React `cache`), `requireUser`, `requireAdmin`, `ADMIN_PHONE` |
 | `cart.ts` | Cart = `{variantId: qty}` in an httpOnly cookie (guests can shop); coupon cookie; `getCartLines` |
 | `products.ts` | `listProducts` (search, filters, sort, pagination), `PAGE_SIZE`, `SORTS` |
@@ -74,16 +75,17 @@ public/                 fonts, sample product photos (/products)
 | `phone.ts` | `toLatinDigits`, `toPersianDigits`, `normalizePhone` |
 | `format.ts` | `toman()`, shipping cost, `ORDER_STATUSES`, `PROVINCES`, `SITE_URL`, `date()` |
 | `flash.ts` | Keeps form values across a redirect after a failed submit |
-| `uploads.ts` | Checks the image type from its bytes, converts to WebP (at most 1200×1500), saves to `data/uploads` |
-| `backup.ts` | `dailyBackup` (keeps 14), `backupNow` |
-| `error-log.ts` | Appends to `data/errors.log` |
+| `uploads.ts` | Checks the image type from its bytes, converts to WebP (at most 1200×1500), saves to Vercel Blob (returns its URL) or `data/uploads` |
+| `error-log.ts` | `console.error` on Vercel, else appends to `data/errors.log` |
 | `csv.ts`, `cities.ts`, `samples.ts` | CSV export, province→city list, sample products and size guides |
 
 ## Data model (lib/db.ts)
 
 Tables: `users` (phone and/or email; `password_hash` may be NULL), `sessions`, `products` (`category`, `subcategory`, `price`, `compare_price`, `image`, `active`), `variants` (size × color × stock, `CHECK stock >= 0`), `product_images` (gallery, with an optional `color`), `categories` (`name`, `size_guide`), `orders` (status, payment `cod|online`, Zarinpal `authority`/`ref_id`, address fields, `coupon`, `discount`, `tracking_code`), `order_items` (copies name/size/color/price so past orders survive product edits), `coupons`, `otp_codes`, `login_failures`, `sms_ip_sends`, `settings`, `search_counts`.
 
-**Migrations:** the base `CREATE TABLE IF NOT EXISTS`, then numbered blocks guarded by `PRAGMA user_version` (currently **12**). To change the schema, append a new block, `transaction(() => { if (schemaVersion() >= 13) return; …; PRAGMA user_version = 13 })`. Never edit an old block. Build workers import `db.ts` in parallel, so every block must be idempotent inside `transaction`.
+**Queries:** `await db.prepare(sql).get(...args)` (also `.all`, `.run` → `{ changes }`), with `?` parameters; rows come back as plain objects, cast with `as`. Every function that queries is `async`, and every call must be awaited (`tsc` misses an unawaited `.run()`). `transaction(async () => …)` opens a write transaction (`BEGIN IMMEDIATE`); statements inside it, including in called functions, use it automatically (AsyncLocalStorage), and nested `transaction()` calls join it.
+
+**Migrations:** `migrate()` in `db.ts` runs on first import: the base `CREATE TABLE IF NOT EXISTS`, then `step(N, …)` blocks guarded by `PRAGMA user_version` (currently **12**). To change the schema, append `await step(13, () => exec(...))` at the end of `migrate()`. Never edit an old step. Build workers and server instances may run them at once, so each step runs in its own transaction and re-checks the version. Queries wait for `migrate()` to finish.
 
 Order statuses are in `ORDER_STATUSES` (`lib/format.ts`): `awaiting_payment`, `pending`, `processing`, `shipped`, `delivered`, `cancelled`.
 
@@ -110,7 +112,9 @@ Order statuses are in `ORDER_STATUSES` (`lib/format.ts`): `awaiting_payment`, `p
 
 | Variable | Default / meaning |
 |---|---|
-| `DB_PATH` | `data/shop.db`. Uploads, backups and logs go in the same folder |
+| `DB_PATH` | `data/shop.db`. Uploads and logs go in the same folder. Ignored when `TURSO_DATABASE_URL` is set |
+| `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` | Use Turso instead of the local file (Vercel) |
+| `BLOB_READ_WRITE_TOKEN` | Store photos in Vercel Blob instead of `data/uploads` |
 | `ADMIN_PHONE` | `09370952694` |
 | `SITE_URL` | `http://localhost:3000`; required in production (payment callback, sitemap, previews) |
 | `ZARINPAL_MERCHANT_ID`, `ZARINPAL_SANDBOX=1` | Payment gateway; the sandbox is automatic in dev |
@@ -120,8 +124,9 @@ Order statuses are in `ORDER_STATUSES` (`lib/format.ts`): `awaiting_payment`, `p
 
 ## Gotchas
 
-- `data/` holds everything persistent: the DB (+ `-wal`/`-shm`), `uploads/`, `backups/`, `errors.log`, `sms-outbox.log`. It's gitignored; never commit or delete it.
-- `next build` imports `lib/db.ts`, which creates and seeds a database. The Dockerfile builds with `DB_PATH=/tmp/build.db` for this reason.
-- Needs a persistent disk; serverless hosts (Vercel) lose the SQLite file.
+- Two ways to run: own server/Docker (everything in `data/`: the DB + `-wal`/`-shm`, `uploads/`, `errors.log`, `sms-outbox.log`; gitignored, never commit or delete it) or Vercel (Turso + Vercel Blob, no disk writes). Code must work in both: don't add new files under `data/` without a Vercel alternative.
+- `next build` imports `lib/db.ts`, which creates and seeds a database. The Dockerfile builds with `DB_PATH=/tmp/build.db`; on Vercel the build talks to Turso.
+- `lib/validation.ts` loads its signing key with a top-level `await` (so `errorParam` stays synchronous for `redirect()` callers).
+- Vercel refuses requests over 4.5 MB, so the product form shrinks photos in the browser (`app/validated-form.tsx`) and caps a save at 4 MB.
 - The rate limits key on the client IP from `X-Forwarded-For`, so the proxy/CDN must pass the real IP (README → CDN).
 - Pages are per-user (cart, session cookies), so they are `no-store`; only static files and `/uploads` are cached.

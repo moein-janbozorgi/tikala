@@ -8,7 +8,7 @@ import sharp from "sharp";
 // Without it (development, tests, Docker), they live next to the database (data/uploads by default): outside public/,
 // which `next start` only serves as it was at build time, and covered by the same backup and .gitignore as the data.
 const blob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
-const BLOB_URL = /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\/products\/[0-9a-f-]{36}\.webp$/;
+const BLOB_URL = /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\/products\/[0-9a-f-]{36}\.(webp|jpg|png)$/; // jpg/png: photos moved by scripts/move-uploads.mjs
 export const UPLOAD_DIR = join(dirname(process.env.DB_PATH ?? "data/shop.db"), "uploads");
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const NAME = /^[0-9a-f-]{36}\.(jpg|png|webp)$/;
