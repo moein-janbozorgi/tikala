@@ -49,6 +49,7 @@ tests/                  shop.test.ts (node:test), e2e.mjs
 instrumentation.ts      onRequestError → lib/error-log.ts
 next.config.ts          standalone output when STANDALONE=1, 5 MB server-action body, security headers, cache headers
 scripts/move-uploads.mjs one-off: copies data/uploads photos to Vercel Blob and rewrites their paths in Turso
+scripts/export-for-turso.mjs one-off: read-only snapshot of data/shop.db (WAL included) as data/turso-import.db for the Turso import
 Dockerfile              two-stage standalone image, data volume at /app/data
 public/                 fonts, sample product photos (/products)
 ```

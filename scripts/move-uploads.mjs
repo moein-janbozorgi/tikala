@@ -2,6 +2,7 @@
 // Turso database at their new URLs. Run it once, after importing data/shop.db into Turso (see README → Vercel):
 //   node --env-file=.env.vercel scripts/move-uploads.mjs [uploads folder, default data/uploads]
 // Safe to run again: a photo already moved no longer starts with /uploads/, so it is skipped.
+// Only the Turso database is changed; data/uploads and data/shop.db are only read.
 import { createClient } from "@libsql/client";
 import { put } from "@vercel/blob";
 import { readFile } from "node:fs/promises";
@@ -30,6 +31,12 @@ for (const { path } of (await db.execute(OLD_PATHS)).rows) {
   }
   // allowOverwrite: a rerun after a failed database update uploads the same name again.
   const { url } = await put(`products/${name}`, bytes, { access: "public", contentType: TYPES[match[1]], allowOverwrite: true });
+  // The database only points at the Blob copy once that copy reads back byte for byte; local files are never changed.
+  const stored = Buffer.from(await (await fetch(url, { cache: "no-store" })).arrayBuffer());
+  if (!stored.equals(bytes)) {
+    console.warn(`skipped ${path}: the copy at ${url} doesn't match the local file`);
+    continue;
+  }
   await db.batch(
     [
       { sql: "UPDATE products SET image = ? WHERE image = ?", args: [url, path] },

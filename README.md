@@ -104,31 +104,39 @@ Vercel's disk is thrown away between requests, so the database lives in **Turso*
 
 > **Iran:** Vercel and Turso are US companies and their terms exclude Iran, so an account can be closed without notice. Zarinpal and Kavenegar may also refuse or slow down requests from servers outside Iran: test a sandbox payment and an SMS login on a preview deploy before going live. A server inside Iran (Docker, above) avoids both problems.
 
-1. **Turso database.** Install the [Turso CLI](https://docs.turso.tech/cli/introduction), then:
-   - Moving an existing shop: stop the server, copy `data/` somewhere safe, then fold the latest changes (kept in
-     `shop.db-wal`) into the file itself, since the upload reads `shop.db` alone:
-     `node -e "new (require('node:sqlite').DatabaseSync)('data/shop.db').exec('PRAGMA wal_checkpoint(TRUNCATE)')"`
-     and create the Turso database from it: `turso db create tikla --from-file data/shop.db`.
-     Check it kept its schema version: `turso db shell tikla "PRAGMA user_version"` must print `12`.
-   - New shop: `turso db create tikla` (tables and sample products are created on first request).
-   - `turso db show tikla --url` gives `TURSO_DATABASE_URL`; `turso db tokens create tikla --expiration none` gives `TURSO_AUTH_TOKEN`.
-   - Create the database in the region closest to the Vercel functions (Vercel → Settings → Functions → Region), since each order makes several round trips.
-2. **Vercel project.** Import the GitHub repository in Vercel. In **Storage**, create a **Blob** store and connect it to the project; that adds `BLOB_READ_WRITE_TOKEN`.
-3. **Environment variables** (Settings → Environment Variables):
+The move is done in two passes, so the live shop's data is never touched while testing: first a **preview** with its own copy of the data, then (only once the preview works) **production** from a fresh copy. The original `data/` folder is only ever read.
 
-   | Variable | Value |
+### A. Preview (testing)
+
+1. **Back up and export.** Stop the local server. Copy the whole `data/` folder somewhere outside the project. Then
+   `node scripts/export-for-turso.mjs`
+   writes `data/turso-import.db`: one file with everything, including the latest changes still in `shop.db-wal`, in the format Turso needs. It opens `shop.db` read-only and checks the copy has the same tables, the same row counts, schema version 12 and no integrity errors.
+2. **Preview database.** Install the [Turso CLI](https://docs.turso.tech/cli/introduction), then
+   `turso db create tikla-preview --from-file data/turso-import.db`
+   (create it in the region closest to Vercel's functions, US East by default, since each order makes several round trips).
+   Check: `turso db shell tikla-preview "PRAGMA user_version"` prints `12`.
+   `turso db show tikla-preview --url` gives `TURSO_DATABASE_URL`; `turso db tokens create tikla-preview --expiration none` gives `TURSO_AUTH_TOKEN`.
+3. **Vercel project without a production deploy.** Importing the GitHub repository in the dashboard deploys `main` to production at once, so create the project from the command line instead: on the `vercel` branch, run `npx vercel link` (creates and links the project, deploys nothing).
+4. **Preview Blob store.** Vercel dashboard → Storage → create a Blob store, connect it to the project for the **Preview** environment only. That adds `BLOB_READ_WRITE_TOKEN` to Preview.
+5. **Preview environment variables** (Settings → Environment Variables, tick **Preview** only, or `npx vercel env add NAME preview`):
+
+   | Variable | Preview value |
    |---|---|
-   | `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` | from step 1 |
-   | `BLOB_READ_WRITE_TOKEN` | added by step 2 |
-   | `SITE_URL` | the shop's public address, e.g. `https://tikla.ir` |
+   | `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` | `tikla-preview` from step 2 |
+   | `BLOB_READ_WRITE_TOKEN` | added by step 4 |
+   | `ZARINPAL_SANDBOX` | `1` (test gateway, no real money) |
    | `ADMIN_PHONE` | the admin's mobile number |
-   | `ZARINPAL_MERCHANT_ID` | merchant ID (or `ZARINPAL_SANDBOX=1` for testing) |
    | `KAVENEGAR_API_KEY`, `KAVENEGAR_OTP_TEMPLATE`, `KAVENEGAR_SENDER` | SMS, as above |
+   | `SITE_URL` | leave unset: payments then return to the preview address itself |
 
-4. **Move existing photos** (only when moving a shop with uploaded photos): put the three keys from steps 1–2 in a local `.env.vercel` file (git ignores it), then run
+6. **Move the photos into the preview.** Put the preview's three keys (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `BLOB_READ_WRITE_TOKEN`) in a local `.env.vercel` file (git ignores it) and run
    `node --env-file=.env.vercel scripts/move-uploads.mjs`.
-   It uploads each file in `data/uploads` to Blob and rewrites its path in the database; it is safe to run again, and ends by printing how many `/uploads/` paths are left (should be 0).
-5. **Deploy.** Push to GitHub; Vercel builds it. In the Zarinpal panel, set the shop's domain to the Vercel domain (or your own domain added in Vercel → Domains). Then place a test order on the preview URL.
+   Each photo in `data/uploads` is uploaded, read back and compared byte for byte, and only then is its path rewritten in the Turso database. It ends by printing how many `/uploads/` paths are left (should be 0) and is safe to run again. Local files are only read.
+7. **Deploy the preview:** `npx vercel deploy` (a preview; never add `--prod`). Open the printed URL (only you can see it while Vercel's deployment protection is on) and test: browsing and search, product pages and photos, register and email login, SMS login, cart and discount code, cash-on-delivery order, online order through the Zarinpal sandbox, account page and cancelling, every admin page (orders, status and SMS, products with a photo upload from a phone, categories, coupons, reports, CSV export, invoice). Errors appear in the project's **Logs** tab.
+
+### B. Production (only after the preview passes)
+
+Stop the live server, make a new backup of `data/`, delete the old `data/turso-import.db` and export again (so orders placed since the preview are included), then repeat steps 2, 4, 5 and 6 with a new database (`tikla`), a Blob store and variables for the **Production** environment, with `SITE_URL` set to the shop's address and `ZARINPAL_MERCHANT_ID` instead of the sandbox. In the Zarinpal panel, register the shop's domain. Deploy with `npx vercel deploy --prod`, or connect the Git repository and merge `vercel` into `main`. Keep the `data/` backup until the new shop has run without problems for a while.
 
 The client IP for the login and SMS limits comes from `X-Forwarded-For`, which Vercel sets itself, so no proxy setup is needed there.
 
