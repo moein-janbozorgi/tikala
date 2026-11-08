@@ -11,15 +11,35 @@ const Ctx = createContext<{ errors: Errors; recheck: (name: string) => void }>({
 // data-check="<name>": a rule shared with the server, which the HTML attributes can't express.
 const CHECKS: Record<string, (el: Field) => string | undefined> = {
   phone: (el) => (!el.value || normalizePhone(el.value) ? undefined : "شماره موبایل معتبر نیست (مثال: ۰۹۱۲۱۲۳۴۵۶۷)"),
-  // Same 5 MB per file as MAX_UPLOAD_BYTES (lib/uploads.ts, server-only), and 25 MB for all the form's photos together
-  // (next.config.ts allows 30 MB per request). Bigger files would otherwise hit the request size limit.
+  // Same 5 MB per file as MAX_UPLOAD_BYTES (lib/uploads.ts, server-only), and 4 MB for all the form's photos together:
+  // Vercel refuses requests over 4.5 MB (next.config.ts allows 5 MB elsewhere). Checked after shrink() below.
   image: (el) => {
     const files = [...((el as HTMLInputElement).files ?? [])];
     if (files.some((f) => f.size > 5 * 1024 * 1024)) return "حجم هر تصویر باید حداکثر ۵ مگابایت باشد";
     const all = [...(el.form?.querySelectorAll<HTMLInputElement>('input[type="file"]') ?? [])].flatMap((i) => [...(i.files ?? [])]);
-    if (all.reduce((sum, f) => sum + f.size, 0) > 25 * 1024 * 1024) return "حجم همه تصویرها با هم باید حداکثر ۲۵ مگابایت باشد";
+    if (all.reduce((sum, f) => sum + f.size, 0) > 4 * 1024 * 1024) return "حجم همه تصویرها با هم باید حداکثر ۴ مگابایت باشد";
   },
 };
+
+/**
+ * Phone photos are several MB each; the server keeps them as WebP of at most 1200×1500 anyway, so they are shrunk to
+ * that here, and a form with many photos stays under the request limit. A file the browser can't read as an image is
+ * sent as it is, for the server to refuse.
+ */
+async function shrink(file: File): Promise<File> {
+  try {
+    const bitmap = await createImageBitmap(file); // upright: applies the photo's EXIF rotation
+    const scale = Math.min(1, 1200 / bitmap.width, 1500 / bitmap.height);
+    const canvas = new OffscreenCanvas(Math.round(bitmap.width * scale), Math.round(bitmap.height * scale));
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    let out = await canvas.convertToBlob({ type: "image/webp", quality: 0.85 });
+    if (out.type !== "image/webp") out = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.85 }); // Safari can't write WebP
+    if (out.size >= file.size) return file;
+    return new File([out], file.name.replace(/\.\w+$/, "") + (out.type === "image/webp" ? ".webp" : ".jpg"), { type: out.type });
+  } catch {
+    return file;
+  }
+}
 
 function problem(el: Field): true | string | undefined {
   const v = el.validity;
@@ -82,6 +102,14 @@ export function ValidatedForm({ children, ...props }: React.ComponentProps<"form
           e.preventDefault(); // React then skips the server action
           e.currentTarget.querySelector<HTMLElement>("[aria-invalid=true]")?.focus();
         }
+      }}
+      onChange={async (e) => {
+        const el = e.target;
+        if (!(el instanceof HTMLInputElement) || el.type !== "file" || !el.files?.length) return;
+        const files = new DataTransfer();
+        for (const f of await Promise.all([...el.files].map(shrink))) files.items.add(f);
+        el.files = files.files; // setting files fires no event, so this doesn't run again
+        recheck(el.name);
       }}
       onInput={(e) => {
         const el = e.target as Field;

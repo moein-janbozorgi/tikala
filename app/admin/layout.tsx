@@ -21,11 +21,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
             {label}
           </Link>
         ))}
-        {/* A plain link: it's a file download, not a page. */}
-        <a href="/admin/backup" download className="ms-auto shrink-0 text-sm text-muted hover:text-ink">
-          دانلود نسخه پشتیبان
-        </a>
-        <Link href="/" className="shrink-0 text-sm text-muted hover:text-ink">
+        <Link href="/" className="ms-auto shrink-0 text-sm text-muted hover:text-ink">
           مشاهده فروشگاه ←
         </Link>
       </nav>

@@ -12,8 +12,11 @@ const FILE = join(dirname(process.env.DB_PATH ?? "data/shop.db"), "errors.log");
 export async function logError(err: unknown, method: string, path: string, kind: string) {
   const message = err instanceof Error ? err.message : String(err);
   const digest = typeof err === "object" && err && "digest" in err ? String(err.digest) : "";
+  const line = [new Date().toISOString(), method, path, kind, digest, message.replace(/\s+/g, " ")].join("\t");
+  // Vercel's disk is thrown away; its function log (in the Vercel dashboard) keeps the line instead.
+  if (process.env.VERCEL) return console.error(line);
   try {
-    await appendFile(FILE, [new Date().toISOString(), method, path, kind, digest, message.replace(/\s+/g, " ")].join("\t") + "\n");
+    await appendFile(FILE, line + "\n");
   } catch (e) {
     console.error("Could not write errors.log", e);
   }

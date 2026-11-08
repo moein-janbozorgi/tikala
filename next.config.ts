@@ -4,9 +4,9 @@ const nextConfig: NextConfig = {
   // The Docker image (Dockerfile) builds with STANDALONE=1: a self-contained server.js with only the files it needs.
   output: process.env.STANDALONE ? "standalone" : undefined,
   experimental: {
-    // The product form uploads photos of up to 5 MB each (lib/uploads.ts), 25 MB per save (app/validated-form.tsx checks
-    // it before sending). Extra room is multipart overhead. Kept this low because it applies to every form.
-    serverActions: { bodySizeLimit: "30mb" },
+    // The product form sends at most 4 MB of photos per save (app/validated-form.tsx shrinks and checks them first); extra
+    // room is multipart overhead. Vercel itself refuses anything over 4.5 MB. Kept this low because it applies to every form.
+    serverActions: { bodySizeLimit: "5mb" },
     // A click or form sent while offline waits and retries instead of failing; app/offline-screen.tsx says why.
     useOffline: true,
   },

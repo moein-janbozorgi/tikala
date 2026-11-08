@@ -1,10 +1,14 @@
+import { del, put } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import sharp from "sharp";
 
-// Uploads live next to the database (data/uploads by default): outside public/, which `next start` only serves as it
-// was at build time, and covered by the same backup and .gitignore as the data.
+// With BLOB_READ_WRITE_TOKEN (Vercel, whose disk is thrown away), photos go to Vercel Blob and are stored by their URL.
+// Without it (development, tests, Docker), they live next to the database (data/uploads by default): outside public/,
+// which `next start` only serves as it was at build time, and covered by the same backup and .gitignore as the data.
+const blob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+const BLOB_URL = /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\/products\/[0-9a-f-]{36}\.webp$/;
 export const UPLOAD_DIR = join(dirname(process.env.DB_PATH ?? "data/shop.db"), "uploads");
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const NAME = /^[0-9a-f-]{36}\.(jpg|png|webp)$/;
@@ -20,7 +24,7 @@ export function detectImageType(bytes: Uint8Array): keyof typeof CONTENT_TYPES |
 }
 
 /**
- * Saves an uploaded product photo and returns its public path. Throws a Persian message if the file isn't acceptable.
+ * Saves an uploaded product photo and returns its public path (or Blob URL). Throws a Persian message if the file isn't acceptable.
  * Phone photos are several MB; each is stored as WebP at most 1200×1500 (upright, metadata such as GPS dropped), so
  * product pages stay light on mobile data.
  */
@@ -35,13 +39,15 @@ export async function saveUpload(file: File) {
     throw new Error("فایل تصویر خراب است یا خوانده نمی‌شود");
   }
   const name = `${randomUUID()}.webp`;
+  if (blob) return (await put(`products/${name}`, webp, { access: "public", contentType: "image/webp" })).url;
   await mkdir(UPLOAD_DIR, { recursive: true });
   await writeFile(join(UPLOAD_DIR, name), webp);
   return `/uploads/${name}`;
 }
 
-/** Deletes a saved upload by its public path; anything that isn't one of our generated names is ignored. */
+/** Deletes a saved upload by its public path or Blob URL; anything that isn't one of our generated names is ignored. */
 export async function deleteUpload(path: string) {
+  if (BLOB_URL.test(path)) return del(path);
   const name = path.replace(/^\/uploads\//, "");
   if (path.startsWith("/uploads/") && NAME.test(name)) await rm(join(UPLOAD_DIR, name), { force: true });
 }

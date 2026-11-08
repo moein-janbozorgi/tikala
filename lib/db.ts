@@ -28,7 +28,8 @@ const rows = (rs: ResultSet) => rs.rows.map((r) => ({ ...r }));
 function statement(sql: string, ready: () => Promise<unknown>) {
   const execute = async (args: InValue[]) => {
     if (!current.getStore()) await ready();
-    return target().execute({ sql, args });
+    // NaN (e.g. Number("abc") from a URL) matched nothing under node:sqlite; libSQL throws on it, so it becomes NULL.
+    return target().execute({ sql, args: args.map((a) => (typeof a === "number" && !Number.isFinite(a) ? null : a)) });
   };
   return {
     get: async (...args: InValue[]): Promise<Record<string, unknown> | undefined> => rows(await execute(args))[0],
@@ -37,17 +38,16 @@ function statement(sql: string, ready: () => Promise<unknown>) {
   };
 }
 
-// Statements before setup finishes (setup itself) run at once; everything else waits for the schema to be ready.
-let setup: Promise<void> | undefined;
+// Every query waits for the schema to be ready (`setup`, started at the end of this file); setup's own statements use `raw`.
 const now = () => Promise.resolve();
 export const db = {
-  prepare: (sql: string) => statement(sql, () => setup ?? now()),
+  prepare: (sql: string) => statement(sql, () => setup),
 };
 const raw = { prepare: (sql: string) => statement(sql, now) };
 
 export async function transaction<T>(fn: () => Promise<T>): Promise<T> {
   if (current.getStore()) return fn();
-  if (setup) await setup;
+  await setup;
   return rawTransaction(fn);
 }
 
@@ -143,7 +143,8 @@ const step = (version: number, change: () => Promise<unknown>) =>
   });
 
 async function migrate() {
-  if (!remote && path !== ":memory:") await client.execute("PRAGMA journal_mode = WAL");
+  // WAL lasts in the file, so one success is enough: build workers opening a new file together may get "busy" here.
+  if (!remote && path !== ":memory:") await client.execute("PRAGMA journal_mode = WAL").catch(() => {});
   await client.executeMultiple(SCHEMA);
 
   await step(1, () =>
@@ -299,7 +300,7 @@ const fillSizeGuide = (name: string) =>
   raw.prepare("UPDATE categories SET size_guide = ? WHERE name = ? AND size_guide = ''").run(SIZE_GUIDES[name], name);
 
 // Started on import; every query waits for it (see db.prepare). A failure is logged here and rejects each query.
-setup = migrate();
+const setup = migrate();
 setup.catch((e) => console.error("Database setup failed", e));
 
 /** Parses admin input lines like "M | مشکی | 10" into variants. */

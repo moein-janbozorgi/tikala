@@ -406,7 +406,7 @@ const discounted = sqlite().prepare("SELECT total, discount, coupon FROM orders 
 const unit = sqlite().prepare("SELECT price FROM products WHERE id = 1").get().price;
 check(discounted.coupon === "E2E10" && discounted.discount === Math.floor(unit / 10) && sqlite().prepare("SELECT used FROM coupons WHERE code = 'E2E10'").get().used === 1 && !cookies.coupon, "checkout stores the discount, counts the use and clears the code");
 
-// ---------- Reports, CSV export, backup ----------
+// ---------- Reports, CSV export ----------
 const report = (await get("/admin/reports")).html;
 check(report.includes("پرفروش‌ترین محصولات") && report.includes("تی‌شرت نخی ساده"), "sales report lists best sellers");
 const exported = await fetch(base + "/admin/export", { headers: { cookie: cookieHeader() } });
@@ -414,11 +414,7 @@ const exported = await fetch(base + "/admin/export", { headers: { cookie: cookie
 const exportedBytes = Buffer.from(await exported.arrayBuffer());
 const exportedText = exportedBytes.toString("utf8");
 check(exported.headers.get("content-type")?.startsWith("text/csv") && exportedBytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf])) && exportedText.includes('"شماره سفارش"') && exportedText.includes('"E2E10"'), "orders export as Excel-ready CSV");
-const backup = await fetch(base + "/admin/backup", { headers: { cookie: cookieHeader() } });
-check(Buffer.from(await backup.arrayBuffer()).subarray(0, 15).toString() === "SQLite format 3", "admin downloads a database backup");
-check((await fetch(base + "/admin/backup", { redirect: "manual" })).status !== 200 && (await fetch(base + "/admin/export", { redirect: "manual" })).status !== 200, "backup and export are admin-only");
-const { readdirSync } = await import("node:fs");
-check(readdirSync(join(dirname(process.env.DB_PATH), "backups")).some((f) => /^shop-\d{4}-\d{2}-\d{2}\.db$/.test(f)), "server made today's automatic backup on start");
+check((await fetch(base + "/admin/export", { redirect: "manual" })).status !== 200, "export is admin-only");
 
 // ---------- Phone login, linking a phone, and "forgot password" ----------
 const p1 = "09350000001";
