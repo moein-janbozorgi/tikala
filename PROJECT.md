@@ -1,6 +1,6 @@
 # Project map (for agents)
 
-Read this before changing code. Human setup and operations are in [README.md](README.md). **Next.js here is 16.4.4 and differs from older versions: read the relevant guide in `node_modules/next/dist/docs/` before writing Next code** (see [AGENTS.md](AGENTS.md); that file is rewritten by `next dev`, so don't edit it).
+Read this before changing code. Human setup and operations are in [README.md](README.md); the engineering rules every change follows are in [GUIDELINES.md](GUIDELINES.md). **Next.js here is 16.4.4 and differs from older versions: read the relevant guide in `node_modules/next/dist/docs/` before writing Next code** (see [AGENTS.md](AGENTS.md); that file is rewritten by `next dev`, so don't edit it).
 
 ## What it is
 
@@ -69,7 +69,7 @@ public/                 fonts, sample product photos (/products)
 | `products.ts` | `listProducts` (search, filters, sort, pagination), `PAGE_SIZE`, `SORTS` |
 | `otp.ts` | SMS login codes: create, check, consume, resend wait, per-IP limit |
 | `sms.ts` | Kavenegar: `sendLoginCode`, `notifyOrder` (best effort, never breaks an order) |
-| `zarinpal.ts` | `startPayment`, `verifyPayment`, `toRial` |
+| `zarinpal.ts` | `startPayment`, `verifyPayment`, `confirmPayment` (the callback's logic: tested in `shop.test.ts`), `toRial` |
 | `password.ts` | Hash/verify, `passwordProblem`, login lockout (stored in the DB) |
 | `validation.ts` | `nameProblem`, `emailProblem`, `productProblem`, `couponProblem`, `normalizePostalCode`, `normalizeCoupon`, `safeNext`, signed `?error=` params (`errorParam`/`readErrorParam`), `likeContains` |
 | `rules.ts` | Regex patterns shared by the forms' `pattern` attribute and the server checks |
@@ -84,7 +84,7 @@ public/                 fonts, sample product photos (/products)
 
 Tables: `users` (phone and/or email; `password_hash` may be NULL), `sessions`, `products` (`category`, `subcategory`, `price`, `compare_price`, `image`, `active`), `variants` (size × color × stock, `CHECK stock >= 0`), `product_images` (gallery, with an optional `color`), `categories` (`name`, `size_guide`), `orders` (status, payment `cod|online`, Zarinpal `authority`/`ref_id`, address fields, `coupon`, `discount`, `tracking_code`), `order_items` (copies name/size/color/price so past orders survive product edits), `coupons`, `otp_codes`, `login_failures`, `sms_ip_sends`, `settings`, `search_counts`.
 
-**Queries:** `await db.prepare(sql).get(...args)` (also `.all`, `.run` → `{ changes }`), with `?` parameters; rows come back as plain objects, cast with `as`. Every function that queries is `async`, and every call must be awaited (`tsc` misses an unawaited `.run()`). `transaction(async () => …)` opens a write transaction (`BEGIN IMMEDIATE`); statements inside it, including in called functions, use it automatically (AsyncLocalStorage), and nested `transaction()` calls join it.
+**Queries:** `await db.prepare(sql).get(...args)` (also `.all`, `.run` → `{ changes }`), with `?` parameters; rows come back as plain objects, cast with `as`. Every function that queries is `async`, and every call must be awaited (`tsc` misses an unawaited `.run()`). `transaction(async () => …)` opens a write transaction (`BEGIN IMMEDIATE`); statements inside it, including in called functions, use it automatically (AsyncLocalStorage), and nested `transaction()` calls join it. Transactions run one at a time per server instance (a queue in `db.ts`), so concurrent checkouts wait instead of failing with SQLITE_BUSY.
 
 **Migrations:** `migrate()` in `db.ts` runs on first import: the base `CREATE TABLE IF NOT EXISTS`, then `step(N, …)` blocks guarded by `PRAGMA user_version` (currently **12**). To change the schema, append `await step(13, () => exec(...))` at the end of `migrate()`. Never edit an old step. Build workers and server instances may run them at once, so each step runs in its own transaction and re-checks the version. Queries wait for `migrate()` to finish.
 
@@ -92,7 +92,7 @@ Order statuses are in `ORDER_STATUSES` (`lib/format.ts`): `awaiting_payment`, `p
 
 ## Key flows
 
-- **Checkout:** `checkout` action → `placeOrder` re-checks stock, the coupon and active products inside one `BEGIN IMMEDIATE` transaction and decrements stock. Cash on delivery starts as `pending`. Online starts as `awaiting_payment`, keeps its stock reserved, then goes to Zarinpal → `/payment/callback` → `verifyPayment`.
+- **Checkout:** `checkout` action → `placeOrder` re-checks stock, the coupon and active products inside one `BEGIN IMMEDIATE` transaction and decrements stock. Cash on delivery starts as `pending`. Online starts as `awaiting_payment`, keeps its stock reserved, then goes to Zarinpal → `/payment/callback` → `confirmPayment` → `verifyPayment`. Money that arrives for an order already expired keeps its `ref_id` and texts the owner to refund it.
 - **Unpaid expiry:** `expireUnpaidOrders()` cancels online orders unpaid for 30 minutes. It runs whenever orders are read or placed; there is no cron.
 - **Cancel:** `cancelOrder` returns the stock and the coupon use, once (cancelling is final).
 - **Money:** integer **Toman** everywhere; Rial (×10) only at the Zarinpal call. Shipping is 85,000, free from 5,000,000 of goods after the discount.

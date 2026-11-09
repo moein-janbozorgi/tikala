@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-process.env.DB_PATH = ":memory:";
+// A real file, not :memory: (libSQL gives an in-memory database a single connection, so two orders at once can't
+// even be tried there). Like Turso, a file lets a second write transaction wait for the first.
+process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), "shop-test-")), "shop.db");
 const { db, cancelOrder, expireUnpaidOrders, parseVariants, placeOrder, purgeOrder } = await import("../lib/db.ts");
 const { shippingCost } = await import("../lib/format.ts");
 const { clearLoginFailures, hashPassword, loginLocked, passwordProblem, recordLoginFailure, verifyPassword } = await import("../lib/password.ts");
@@ -372,4 +377,65 @@ test("product listing: home shows pages 1..N, the API one page at a time, with f
   const cheap = await listProducts({ max: String(shoes.products[1].price), category: "کفش" });
   assert.ok(cheap.products.length >= 2 && cheap.products.every((p) => p.price <= shoes.products[1].price));
   assert.ok((await listProducts({})).products.every((p) => p.variants.every((v) => v.product_id === p.id && v.stock > 0)));
+});
+test("two customers buying the last item at once: one order, never negative stock", async () => {
+  const v = (await db.prepare("SELECT id FROM variants WHERE stock > 0 LIMIT 1").get()) as { id: number };
+  await db.prepare("UPDATE variants SET stock = 1 WHERE id = ?").run(v.id);
+  const results = await Promise.allSettled([placeOrder(user.id, { [v.id]: 1 }, info), placeOrder(user.id, { [v.id]: 1 }, info)]);
+  assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
+  const failed = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+  assert.match(failed.reason.message, /کافی نیست/);
+  assert.equal(await stockOf(v.id), 0);
+});
+
+test("payment callback: verified once on the server, NOK and failures leave the order unpaid, late payments flagged", async () => {
+  const { confirmPayment } = await import("../lib/zarinpal.ts");
+  const realFetch = globalThis.fetch;
+  let verifyCode = 100;
+  let verifyCalls = 0;
+  globalThis.fetch = (async () => {
+    verifyCalls++;
+    return new Response(JSON.stringify({ data: { code: verifyCode, ref_id: 777 }, errors: [] }));
+  }) as typeof fetch;
+  try {
+    const v = (await db.prepare("SELECT id FROM variants WHERE stock >= 3 LIMIT 1").get()) as { id: number };
+    const order = async (authority: string) => {
+      const id = await placeOrder(user.id, { [v.id]: 1 }, info, "online");
+      await db.prepare("UPDATE orders SET authority = ? WHERE id = ?").run(authority, id);
+      return id;
+    };
+    const row = async (id: number) => (await db.prepare("SELECT status, ref_id FROM orders WHERE id = ?").get(id)) as { status: string; ref_id: string | null };
+
+    assert.deepEqual(await confirmPayment("", "OK"), { error: "تراکنش پیدا نشد" });
+    assert.deepEqual(await confirmPayment("A-unknown", "OK"), { error: "تراکنش پیدا نشد" });
+
+    const nok = await order("A-nok");
+    assert.match((await confirmPayment("A-nok", "NOK")).error, /پرداخت انجام نشد/);
+    assert.equal(verifyCalls, 0, "a NOK return is never verified");
+    assert.equal((await row(nok)).status, "awaiting_payment");
+
+    const ok = await order("A-ok");
+    assert.deepEqual(await confirmPayment("A-ok", "OK"), { orderId: ok, error: "", notify: "paid" });
+    assert.deepEqual(await row(ok), { status: "pending", ref_id: "777" });
+    verifyCode = 101;
+    assert.deepEqual(await confirmPayment("A-ok", "OK"), { orderId: ok, error: "" }, "a repeated callback sends no second SMS");
+
+    verifyCode = -51;
+    const bad = await order("A-bad");
+    assert.match((await confirmPayment("A-bad", "OK")).error, /تأیید نشد/);
+    assert.equal((await row(bad)).status, "awaiting_payment");
+
+    // The order expires while Zarinpal is verifying: the money is in, so the owner must refund it.
+    verifyCode = 100;
+    const late = await order("A-late");
+    globalThis.fetch = (async () => {
+      await cancelOrder(late);
+      return new Response(JSON.stringify({ data: { code: 100, ref_id: 888 } }));
+    }) as typeof fetch;
+    const result = await confirmPayment("A-late", "OK");
+    assert.equal(result.notify, "late_payment");
+    assert.deepEqual(await row(late), { status: "cancelled", ref_id: "888" });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db } from "./db.ts";
 
 // Without a merchant ID, dev runs against the sandbox. Production never falls back to it, so fake payments can't mark orders paid.
 const merchant = process.env.ZARINPAL_MERCHANT_ID;
@@ -47,4 +47,31 @@ export async function verifyPayment(authority: string, amountRial: number) {
   // 100 = verified now, 101 = already verified by an earlier callback.
   if (data.code === 100 || data.code === 101) return String(data.ref_id ?? "");
   throw new Error(`پرداخت تأیید نشد (کد ${errorCode ?? data.code ?? "نامشخص"})`);
+}
+
+/**
+ * Handles Zarinpal's return (?Authority=...&Status=OK|NOK). Nothing in the URL is trusted: the order is found by
+ * authority and the amount comes from the database. Only orders still awaiting payment are verified; an unverified
+ * payment is refunded by Zarinpal automatically. `notify` says which SMS the caller should send.
+ */
+export async function confirmPayment(authority: string, status: string | null): Promise<{ orderId?: number; error: string; notify?: "paid" | "late_payment" }> {
+  const order = authority
+    ? ((await db.prepare("SELECT id, total, status FROM orders WHERE authority = ?").get(authority)) as { id: number; total: number; status: string } | undefined)
+    : undefined;
+  if (!order) return { error: "تراکنش پیدا نشد" };
+  if (order.status === "cancelled") return { orderId: order.id, error: "این سفارش لغو شده است" };
+  if (order.status !== "awaiting_payment") return { orderId: order.id, error: "" }; // already paid: a repeated callback
+  if (status !== "OK") return { orderId: order.id, error: "پرداخت انجام نشد. می‌توانید دوباره تلاش کنید." };
+  let refId: string;
+  try {
+    refId = await verifyPayment(authority, toRial(order.total));
+  } catch (e) {
+    return { orderId: order.id, error: e instanceof Error ? e.message : "خطا در تأیید پرداخت" };
+  }
+  const paid = await db.prepare("UPDATE orders SET status = 'pending', ref_id = ? WHERE id = ? AND status = 'awaiting_payment'").run(refId, order.id);
+  if (paid.changes) return { orderId: order.id, error: "", notify: "paid" };
+  // Expired (cancelled) while Zarinpal was verifying: the money is taken, so keep the bank reference for the refund.
+  await db.prepare("UPDATE orders SET ref_id = ? WHERE id = ?").run(refId, order.id);
+  console.error(`Order ${order.id} was paid (ref ${refId}) after it was cancelled; refund it`);
+  return { orderId: order.id, error: "پرداخت انجام شد ولی مهلت سفارش تمام شده بود؛ مبلغ توسط فروشگاه بازگردانده می‌شود", notify: "late_payment" };
 }

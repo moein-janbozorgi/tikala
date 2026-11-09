@@ -50,12 +50,14 @@ export async function sendLoginCode(phone: string, code: string) {
 }
 
 /** Order update by SMS. Best effort: a failed message is logged and never breaks the order. */
-export async function notifyOrder(orderId: number, event: "placed" | "paid" | "shipped") {
+export async function notifyOrder(orderId: number, event: "placed" | "paid" | "shipped" | "late_payment") {
   const order = (await db.prepare("SELECT id, phone, total, ref_id, tracking_code FROM orders WHERE id = ?").get(orderId)) as
     | { id: number; phone: string; total: number; ref_id: string | null; tracking_code: string }
     | undefined;
   if (!order) return;
   const n = order.id.toLocaleString("fa-IR");
+  // Money arrived for an order that had already expired: only the owner is told, to refund it.
+  if (event === "late_payment") return send(ADMIN_PHONE, `تیکلا: پرداخت سفارش لغوشده ${n} با کد پیگیری ${order.ref_id ?? "-"} رسید؛ مبلغ را بازگردانید.`, orderId);
   const text = {
     placed: `سفارش ${n} ثبت شد. مبلغ: ${toman(order.total)}، پرداخت هنگام تحویل.`,
     paid: `پرداخت سفارش ${n} انجام شد. کد پیگیری: ${order.ref_id ?? "-"}`,

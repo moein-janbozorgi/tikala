@@ -51,7 +51,18 @@ export async function transaction<T>(fn: () => Promise<T>): Promise<T> {
   return rawTransaction(fn);
 }
 
-async function rawTransaction<T>(fn: () => Promise<T>): Promise<T> {
+// One write transaction at a time per server instance. A local file's driver blocks the whole process while BEGIN waits
+// for a lock, so a second checkout started during the first would freeze the server for 5 s and then fail with
+// SQLITE_BUSY; queued here, it runs right after and sees the updated stock. Separate Vercel instances still meet at Turso's own lock.
+let queue: Promise<unknown> = Promise.resolve();
+
+function rawTransaction<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queue.then(() => runTransaction(fn));
+  queue = run.catch(() => {});
+  return run;
+}
+
+async function runTransaction<T>(fn: () => Promise<T>): Promise<T> {
   const tx = await client.transaction("write"); // BEGIN IMMEDIATE
   try {
     const result = await current.run(tx, fn);
