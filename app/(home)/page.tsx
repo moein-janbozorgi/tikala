@@ -10,21 +10,20 @@ import { LoadMore } from "../load-more";
 import { PriceRange } from "../price-range";
 import { ProductCard } from "../product-card";
 
-// Icon and circle color per category; a category the admin adds later gets the bag icon and a color by position.
-const CATEGORY_LOOK: Record<string, [() => React.ReactNode, string]> = {
-  "": [GridIcon, "bg-neutral-800"],
-  "تی‌شرت": [TshirtIcon, "bg-rose-500"],
-  "پیراهن": [ShirtIcon, "bg-sky-500"],
-  "شلوار": [PantsIcon, "bg-indigo-600"],
-  "هودی": [HoodieIcon, "bg-orange-500"],
-  "کفش": [ShoeIcon, "bg-teal-600"],
-  "کاپشن و ژاکت": [JacketIcon, "bg-emerald-700"],
-  "بافت": [SweaterIcon, "bg-lime-600"],
-  "عینک": [GlassesIcon, "bg-red-600"],
+// Icon per category; a category the admin adds later gets the bag icon.
+const CATEGORY_ICON: Record<string, () => React.ReactNode> = {
+  "": GridIcon,
+  "تی‌شرت": TshirtIcon,
+  "پیراهن": ShirtIcon,
+  "شلوار": PantsIcon,
+  "هودی": HoodieIcon,
+  "کفش": ShoeIcon,
+  "کاپشن و ژاکت": JacketIcon,
+  "بافت": SweaterIcon,
+  "عینک": GlassesIcon,
 };
 // A sort or sale chip's label while its list loads.
 const PENDING_CHIP = "data-pending:animate-pulse data-pending:opacity-50 motion-reduce:animate-none";
-const FALLBACK_COLORS = ["bg-violet-600", "bg-amber-500", "bg-cyan-600", "bg-fuchsia-600", "bg-blue-600"];
 
 /**
  * Each category (and type) gets its own title and description, so it can rank for searches like «خرید کفش». The
@@ -65,34 +64,34 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     <>
       <ErrorMessage error={typeof params.error === "string" ? params.error : undefined} />
       {category || q ? null : (
-        <section className="mb-6 flex flex-col-reverse items-start justify-between gap-6 rounded-3xl bg-brand px-5 py-7 text-brand-ink sm:mb-10 sm:flex-row sm:items-center sm:px-12 sm:py-16">
+        <section className="mb-6 flex flex-col-reverse items-start justify-between gap-6 rounded-3xl bg-hero px-5 py-7 text-hero-ink sm:mb-10 sm:flex-row sm:items-center sm:px-12 sm:py-16">
           <div>
-            <p className="mb-3 inline-block rounded-full bg-brand-ink px-3 py-1 text-xs font-bold text-brand sm:mb-4">بوتیک آنلاین تیکلا</p>
+            <p className="mb-3 inline-block rounded-full bg-brand px-3 py-1 text-xs font-bold text-brand-ink sm:mb-4">بوتیک آنلاین تیکلا</p>
             <h1 className="max-w-lg font-display text-3xl leading-tight text-balance sm:text-6xl sm:leading-tight">استایل هر روزت را این‌جا پیدا کن</h1>
             {/* On phones the banner stays short so products show sooner; the features are in the footer too. */}
-            <p className="mt-4 hidden max-w-lg leading-8 text-brand-ink/80 sm:block">
+            <p className="mt-4 hidden max-w-lg leading-8 text-hero-ink/75 sm:block">
               از تی‌شرت و پیراهن تا شلوار، هودی، بافت و کفش؛ لباس‌های مد روز را با سایز و رنگ دلخواهت انتخاب کن، آنلاین یا هنگام تحویل
               پرداخت کن و سفارشت را درِ خانه تحویل بگیر.
             </p>
             <ul className="mt-6 hidden flex-wrap gap-2 text-xs font-medium sm:flex sm:text-sm">
               {FEATURES.map((f) => (
-                <li key={f.label} className="flex items-center gap-1.5 rounded-full bg-white/60 px-3 py-1.5">
+                <li key={f.label} className="flex items-center gap-1.5 rounded-full bg-hero-ink/10 px-3 py-1.5">
                   {f.icon}
                   {f.label}
                 </li>
               ))}
             </ul>
           </div>
-          <div className="hidden size-20 shrink-0 place-items-center rounded-full bg-white p-3 shadow-lg shadow-brand-ink/10 sm:grid sm:size-44 sm:p-7">
+          <div className="hidden size-20 shrink-0 place-items-center rounded-full bg-hero-ink p-3 sm:grid sm:size-44 sm:p-7">
             <BagCheckArt className="size-full" />
           </div>
         </section>
       )}
 
       <nav aria-label="دسته‌بندی‌ها" className="mb-6 flex justify-between gap-4 overflow-x-auto p-1 pb-2 sm:gap-6">
-        {[{ category: "" }, ...categories].map((c, i) => {
+        {[{ category: "" }, ...categories].map((c) => {
           const active = (category ?? "") === c.category;
-          const [CategoryIcon, color] = CATEGORY_LOOK[c.category] ?? [BagIcon, FALLBACK_COLORS[i % FALLBACK_COLORS.length]];
+          const CategoryIcon = CATEGORY_ICON[c.category] ?? BagIcon;
           return (
             <Link
               key={c.category}
@@ -102,9 +101,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             >
               {/* While the new list loads: a pulsing ring on the tapped category. */}
               <LinkPending
-                className={`block rounded-full ring-offset-2 ring-offset-surface transition group-hover:scale-105 data-pending:animate-pulse data-pending:ring-2 data-pending:ring-accent motion-reduce:animate-none ${active ? "ring-2 ring-accent" : ""}`}
+                className="block rounded-full ring-offset-2 ring-offset-surface transition group-hover:scale-105 data-pending:animate-pulse data-pending:ring-2 data-pending:ring-accent motion-reduce:animate-none"
               >
-                <span className={`grid size-14 place-items-center rounded-full text-white sm:size-16 [&_svg]:size-7 ${color}`}>
+                <span className={`grid size-14 place-items-center rounded-full border sm:size-16 [&_svg]:size-7 ${active ? "border-ink bg-ink text-page" : "border-line bg-surface-2 text-ink"}`}>
                   <CategoryIcon />
                 </span>
               </LinkPending>

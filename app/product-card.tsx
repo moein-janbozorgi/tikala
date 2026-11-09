@@ -25,7 +25,7 @@ export function ProductCard({ product: p, eager = false }: { product: ProductWit
             </span>
           ) : null}
           {percentOff(p.price, p.compare_price) ? (
-            <span className="absolute top-2.5 left-2.5 rounded-full bg-danger px-2.5 py-1 text-[11px] font-bold text-page">
+            <span className="absolute top-2.5 left-2.5 rounded-full bg-brand px-2.5 py-1 text-[11px] font-bold text-brand-ink">
               {`${percentOff(p.price, p.compare_price).toLocaleString("fa-IR")}٪ تخفیف`}
             </span>
           ) : null}

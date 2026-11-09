@@ -3,16 +3,20 @@
 /* Each token is defined once: light-dark() follows color-scheme, which data-theme pins, or the OS decides. */
 :root {
   color-scheme: light dark;
-  --page: light-dark(#f4f5f9, #0e1222);
-  --surface: light-dark(#ffffff, #161b2e);
-  --surface-2: light-dark(#e9ecf4, #1f263d);
-  --line: light-dark(#d9dde8, #2c3450);
-  --ink: light-dark(#141a33, #eef0f8);
-  --muted: light-dark(#586079, #9aa2bd);
-  --accent: light-dark(#3b3fb6, #a5adff);
-  /* The yellow of the tik logo: buy buttons and the hero. Text on it stays navy in both themes. */
+  /* Monochrome: ink on paper; links and focus rings are ink too (links stay underlined). */
+  --page: light-dark(#f5f5f3, #0f0f0f);
+  --surface: light-dark(#ffffff, #181818);
+  --surface-2: light-dark(#ebebe8, #232323);
+  --line: light-dark(#dcdcd7, #2f2f2f);
+  --ink: light-dark(#121212, #f2f2ef);
+  --muted: light-dark(#5f5f5a, #a3a39d);
+  --accent: var(--ink);
+  /* The yellow of the tik logo, only as a small highlight: sale badges, eyebrow pills, the cart count. */
   --brand: light-dark(#ffc928, #f5c232);
-  --brand-ink: #141a33;
+  --brand-ink: #121212;
+  /* Hero and about banners: a dark block in both themes, a step above the page in dark. */
+  --hero: light-dark(#121212, #1c1c1c);
+  --hero-ink: #f5f5f3;
   --danger: light-dark(#b42318, #f97066);
   --success: light-dark(#067647, #47cd89);
 }
@@ -36,6 +40,8 @@
   --color-accent: var(--accent);
   --color-brand: var(--brand);
   --color-brand-ink: var(--brand-ink);
+  --color-hero: var(--hero);
+  --color-hero-ink: var(--hero-ink);
   --color-danger: var(--danger);
   --color-success: var(--success);
 }
@@ -69,10 +75,10 @@ body {
     @apply animate-pulse rounded-2xl bg-surface-2 motion-reduce:animate-none;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-bold text-brand-ink transition hover:brightness-95 disabled:pointer-events-none disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-page transition hover:opacity-85 active:scale-[.98] disabled:pointer-events-none disabled:opacity-40;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border border-line px-4 py-2 text-sm transition hover:bg-surface-2;
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-line px-4 py-2 text-sm transition hover:bg-surface-2 active:scale-[.98];
   }
   .icon-btn {
     @apply grid size-10 place-items-center rounded-full text-muted transition hover:bg-surface-2 hover:text-ink;
@@ -91,7 +97,7 @@ body {
     @apply rounded-2xl border border-line bg-surface p-5;
   }
   .chip {
-    @apply inline-flex cursor-pointer items-center rounded-full border border-line bg-surface px-4 py-1.5 text-sm transition hover:border-ink;
+    @apply inline-flex cursor-pointer items-center rounded-full border border-line bg-surface px-4 py-1.5 text-sm transition hover:border-ink active:scale-[.98];
   }
   /* Handles of the two stacked range inputs in app/price-range.tsx: only the handles take touches, so both can be dragged. */
   .price-thumb::-webkit-slider-thumb {

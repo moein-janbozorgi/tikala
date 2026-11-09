@@ -17,10 +17,10 @@ export default async function AboutPage() {
 
   return (
     <article className="mx-auto max-w-3xl space-y-6 leading-8">
-      <header className="rounded-3xl bg-brand px-6 py-10 text-brand-ink sm:px-10">
-        <p className="mb-3 inline-block rounded-full bg-brand-ink px-3 py-1 text-xs font-bold text-brand">درباره ما</p>
+      <header className="rounded-3xl bg-hero px-6 py-10 text-hero-ink sm:px-10">
+        <p className="mb-3 inline-block rounded-full bg-brand px-3 py-1 text-xs font-bold text-brand-ink">درباره ما</p>
         <h1 className="font-display text-4xl leading-tight sm:text-5xl">بوتیک تیکلا</h1>
-        <p className="mt-4 text-brand-ink/80">
+        <p className="mt-4 text-hero-ink/75">
           تیکلا یک بوتیک آنلاین لباس است برای کسانی که می‌خواهند ساده، راحت و مد روز لباس بپوشند. هر محصول را با عکس، توضیحات، سایز و رنگ موجود
           می‌بینید و بدون رفتن به بازار، سفارشتان را درِ خانه تحویل می‌گیرید.
         </p>

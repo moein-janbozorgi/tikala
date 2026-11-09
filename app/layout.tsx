@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { Lalezar, Vazirmatn } from "next/font/google";
@@ -27,6 +27,15 @@ export const metadata: Metadata = {
   description: "بوتیک تیکلا عرضه کننده انواع لباس و شلوار مد روز",
   // Link previews on Telegram, WhatsApp, Instagram…; product pages add their name and photo.
   openGraph: { siteName: "تیکلا", locale: "fa_IR", type: "website" },
+};
+
+// Browser bar matches the page ground (app/globals.css --page).
+// shortcut: follows the OS scheme, not a theme pinned with the header toggle; read the theme cookie in generateViewport if that matters.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f5f3" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f0f0f" },
+  ],
 };
 
 // Every page shows the cart and login state from cookies, and products come from the database.
@@ -117,7 +126,7 @@ export default async function RootLayout({ children, auth }: LayoutProps<"/">) {
                 <BagIcon />
                 <span className="hidden sm:inline">سبد خرید</span>
                 {count > 0 ? (
-                  <span className="absolute -top-1 -left-1 grid size-5 place-items-center rounded-full bg-ink text-[11px] text-page">
+                  <span className="absolute -top-1 -left-1 grid size-5 place-items-center rounded-full bg-brand text-[11px] font-bold text-brand-ink">
                     {count.toLocaleString("fa-IR")}
                   </span>
                 ) : null}
